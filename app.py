@@ -182,36 +182,34 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [إصلاح برمي نهائي وجذري]: استخراج قيم نصوص وأرقام صافية تماماً بدون أشكال المصفوفات والأقواس
+                # تنظيف الكلمات الصافية منعاً لتعليق القوائم المنسدلة
                 curr_cat = str(row_filtered["Category"].values[0])
                 curr_type = str(row_filtered["Type"].values[0])
                 curr_amount = float(row_filtered["Amount"].values[0])
                 curr_desc = str(row_filtered["Description"].values[0])
                 
-                st.markdown(f"**Current Data:** Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}` | Note: `{curr_desc}`")
+                st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
+                st.markdown("---")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Option A: Edit Selected Item**")
-                    cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
-                    try:
-                        default_idx = cat_options.index(curr_cat)
-                    except ValueError:
-                        default_idx = 0
-                        
-                    edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                    edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
-                    edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
+                # [إعادة هيكلة كاملة للتصميم] فصل الخيارات في أسطر مستقلة واضحة 100% لحل مشكلة اختفاء الأزرار
+                st.subheader("✏️ Option 1: Edit & Update Record")
+                cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
+                try:
+                    default_idx = cat_options.index(curr_cat)
+                except ValueError:
+                    default_idx = 0
                     
-                    if st.button("✏️ Save Changes"):
-                        df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
-                        df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                        df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
-                        df_all.to_csv(DATA_FILE, index=False)
-                        st.success(f"Transaction ID {selected_id} updated successfully!")
-                        st.rerun()
-                        
-                with col2:
-                    st.write("**Option B: Delete Selected Item**")
-                    st.write("Warning: This action cannot be undone.")
+                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
+                edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
+                edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
+                
+                if st.button("💾 Save Changes and Update"):
+                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
+                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
+                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.success(f"Transaction ID {selected_id} updated successfully!")
+                    st.rerun()
                     
+                st.markdown("---")
+                st.subheader("🗑️ Option 2: Delete Record")
