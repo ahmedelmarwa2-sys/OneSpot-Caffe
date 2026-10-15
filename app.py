@@ -1,10 +1,7 @@
-    # 2. إعدادات البانر الرئيسي الفخم (تم دمج صورة OneSpot الأصلية بكامل وضوحها)
-    # تأكد من تسمية الصورة في مجلد المشروع باسم banner.png أو تعديل الاسم في الكود بالأسفل
+    # 2. إعدادات البانر الرئيسي الفخم (مصحح المسافات بنسبة 100%)
     try:
-        # عرض صورة البانر بعرض الشاشة بالكامل لتظهر تفاصيل حبوب القهوة بدقة عالية
         st.image("banner.png", use_container_width=True)
     except:
-        # حل بديل مرن في حال لم يتم العثور على ملف الصورة مؤقتاً
         st.markdown(
             """
             <div style='background: #1a1a1a; padding: 20px; border-radius: 12px; text-align: center; border-bottom: 3px solid #d4af37;'>
@@ -14,7 +11,6 @@
             unsafe_allow_html=True
         )
         
-    # إضافة عنوان النظام أسفل البانر مباشرة بتنسيق ناعم ومتناسق مع الألوان الدافئة للصورة
     st.markdown(
         """
         <div style='text-align: center; margin-top: -10px; margin-bottom: 25px;'>
