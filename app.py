@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
+import io
 
 # 1. إعدادات الحماية والأمان بالباسورد (نسخة التشغيل المحلي)
 def check_password():
@@ -28,7 +29,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns([1, 3, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -112,6 +113,7 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # حساب جدول الأداء الشهري
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({'Total Income': x[x['Type'] == 'Income']['Amount'].sum(), 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(), 'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()}), include_groups=False).reset_index()
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
@@ -126,61 +128,57 @@ if check_password():
             df_inc = df_all[df_all['Type'] == 'Income']
             df_expenses = df_all[df_all['Type'] == 'Expense']
             
+            # إعداد بيانات التحليل للتاريخ لدمجها لاحقاً في التقرير
+            inc_data = pd.DataFrame()
+            exp_data = pd.DataFrame()
+            
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
                 if not df_inc.empty:
-                    inc_data = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(inc_data.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    inc_data = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'})
+                    st.dataframe(inc_data, use_container_width=True, hide_index=True)
                 else:
                     st.write("No income recorded.")
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
                 if not df_expenses.empty:
-                    exp_data = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(exp_data.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    exp_data = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'})
+                    st.dataframe(exp_data, use_container_width=True, hide_index=True)
                 else:
                     st.write("No expenses recorded.")
             
-            # قسم أزرار التصدير الذكية والمنفصلة
+            # [بناء التقرير المدمج الجديد للطباعة الفورية]
             st.markdown("<br><hr>", unsafe_allow_html=True)
-            st.subheader("📥 تصدير وتحميل التقارير للطباعة")
+            st.subheader("📥 تصدير التقرير والتحليل للطباعة")
             
-            btn_col1, btn_col2 = st.columns(2)
+            # دمج الجداول والملخصات مع فواصل منسقة في نص واحد متوافق مع إكسيل
+            output = io.StringIO()
+            output.write("--- ONE SPOT CAFE - MONTHLY PERFORMANCE REPORT ---\n\n")
+            output.write(f"Report Date: {datetime.date.today()}\n")
+            output.write(f"Total Income: ${total_income_all:,.2f} | Total Expenses: ${total_expense_all:,.2f} | Net Profit: ${net_profit_all:,.2f}\n\n")
             
-            with btn_col1:
-                # إنشاء ملف يحتوي على الأرباح الشهرية المجمعة فقط
-                summary_csv = styled_summary.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    label="📊 تحميل ملخص الأداء الشهري فقط (Excel)",
-                    data=summary_csv,
-                    file_name=f"OneSpot_Monthly_Summary_{datetime.date.today()}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+            output.write("1. SUMMARY PER MONTH (ملخص الأداء الشهري):\n")
+            styled_summary.to_csv(output, index=False)
+            
+            output.write("\n\n2. BREAKDOWN: INCOME ANALYSIS (تحليل بنود الإيرادات بالتاريخ):\n")
+            if not inc_data.empty:
+                inc_data.to_csv(output, index=False)
+            else:
+                output.write("No income data recorded.\n")
                 
-            with btn_col2:
-                # إنشاء ملف يحتوي على القيود اليومية المفصلة كاملة
-                full_csv = df_all.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    label="📅 تحميل كشف القيود اليومية بالتفصيل (Excel)",
-                    data=full_csv,
-                    file_name=f"OneSpot_Daily_Transactions_{datetime.date.today()}.csv",
-                    mime="text/csv",
-                    type="primary",
-                    use_container_width=True
-                )
-            
-        else:
-            st.info("No data recorded yet.")
+            output.write("\n\n3. BREAKDOWN: EXPENSE ANALYSIS (تحليل بنود المصروفات بالتاريخ):\n")
+            if not exp_data.empty:
+                exp_data.to_csv(output, index=False)
+            else:
+                output.write("No expense data recorded.\n")
                 
-    with tab2:
-        st.subheader("All Records Saved")
-        if not df_all.empty: st.dataframe(df_all, use_container_width=True, hide_index=True)
-        else: st.info("No data recorded yet.")
-
-    with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
-        if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
-            if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
-                df_all[df_all["ID"] != selected_id].to_csv(DATA_FILE, index=False)
+            combined_csv = output.getvalue().encode('utf-8-sig')
+            
+            # زر التحميل الموحد الكبير والمميز لطباعة التقرير الشامل
+            st.download_button(
+                label="🖨️ تحميل تقرير الأداء المجمع + تحليل البنود بالتاريخ (Excel جاهز للطباعة)",
+                data=combined_csv,
+                file_name=f"OneSpot_Full_Financial_Report_{datetime.date.today()}.csv",
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
