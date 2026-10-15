@@ -28,7 +28,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات العنوان الرئيسي والشعار
-    col_logo, col_title = st.columns([1, 6])
+    col_logo, col_title = st.columns(2)
     with col_logo:
         try:
             st.image("logo.png", width=90)
@@ -201,4 +201,4 @@ if check_password():
                         df_all.to_csv(DATA_FILE, index=False)
                         st.success(f"Transaction ID {selected_id} deleted successfully!")
                         st.rerun()
-        else:
+            else:
