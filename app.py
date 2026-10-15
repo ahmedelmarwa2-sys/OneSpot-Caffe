@@ -48,8 +48,8 @@ if check_password():
         unsafe_allow_html=True
     )
 
-    # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns()
+    # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق (تم إصلاح تمرير الأعمدة هنا)
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
         try:
@@ -164,10 +164,9 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
-        # احتواء منطقة التقارير والتحليل المالي التفصيلي بالكامل داخل حاوية طباعة واحدة
         st.markdown("<div class='print-container'>", unsafe_allow_html=True)
         
-        title_col, print_btn_col = st.columns()
+        title_col, print_btn_col = st.columns([3, 1]) # تحديد حجم الأعمدة للعنوان والزر
         with title_col:
             st.subheader("Monthly Performance (Profit & Loss)")
         with print_btn_col:
@@ -203,7 +202,6 @@ if check_password():
             styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
             st.dataframe(styled_summary, use_container_width=True, hide_index=True)
             
-            # قسم التحليل المالي بالتاريخ (تم تضمينه ليصبح داخل حاوية الطباعة تلقائياً)
             st.markdown("<br><hr style='border: 1px dashed #ccc;'><br>", unsafe_allow_html=True)
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             
