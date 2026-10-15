@@ -169,7 +169,6 @@ if check_password():
     with tab2:
         st.subheader("All Records Saved")
         if not df_all.empty:
-            # توليد رقم مسلسل مرئي يبدأ من 1 بشكل ديناميكي دون الكتابة في ملف الـ CSV الرئيسي
             df_display = df_all.copy()
             df_display.insert(0, "S.N (مسلسل)", range(1, len(df_display) + 1))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
@@ -183,6 +182,7 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
+                # [تعديل جذري وأمان محاسبي الحل النهائي]: استخراج قيم مفردة صافية تماماً [0] لمنع تدمير رسم بقية الأزرار
                 curr_cat = str(row_filtered["Category"].values[0])
                 curr_type = str(row_filtered["Type"].values[0])
                 curr_amount = float(row_filtered["Amount"].values[0])
