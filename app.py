@@ -144,14 +144,12 @@ if check_password():
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            # [التعديل المطلوب]: إظهار تاريخ المعاملة الفعلي المعمول داخل جداول التحليلات بالتفصيل
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             col_inc, col_exp = st.columns(2)
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
                 df_inc = df_all[df_all['Type'] == 'Income']
                 if not df_inc.empty:
-                    # تجميع وعرض البيانات مضافاً إليها تاريخ البند المختار المعمول به
                     inc_breakdown = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
                     st.dataframe(inc_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income (\$)'}), use_container_width=True, hide_index=True)
                 else:
@@ -160,7 +158,6 @@ if check_password():
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
                 df_expenses = df_all[df_all['Type'] == 'Expense']
                 if not df_expenses.empty:
-                    # تجميع وعرض البيانات مضافاً إليها تاريخ البند المختار المعمول به
                     expense_breakdown = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
                     st.dataframe(expense_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent (\$)'}), use_container_width=True, hide_index=True)
                 else:
@@ -171,9 +168,8 @@ if check_password():
     with tab2:
         st.subheader("All Records Saved")
         if not df_all.empty:
-            df_display = df_all.copy()
-            df_display.insert(0, "S.N (مسلسل)", range(1, len(df_display) + 1))
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            # [تعديل هنا]: عرض الجدول مباشرة بدون إضافة عمود المسلسل S.N
+            st.dataframe(df_all, use_container_width=True, hide_index=True)
         else:
             st.info("No data recorded yet.")
 
@@ -184,12 +180,11 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # استخراج نصوص مجردة بشكل مباشر وآمن لمنع الأخطاء التكرارية للواجهة
-                curr_date = str(row_filtered["Date"].values[0])
-                curr_cat = str(row_filtered["Category"].values[0])
-                curr_type = str(row_filtered["Type"].values[0])
-                curr_amount = float(row_filtered["Amount"].values[0])
-                curr_desc = str(row_filtered["Description"].values[0])
+                curr_date = str(row_filtered["Date"].values)
+                curr_cat = str(row_filtered["Category"].values)
+                curr_type = str(row_filtered["Type"].values)
+                curr_amount = float(row_filtered["Amount"].values)
+                curr_desc = str(row_filtered["Description"].values)
                 
                 st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Date: `{curr_date}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
                 st.markdown("---")
@@ -210,3 +205,9 @@ if check_password():
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
                     df_all.to_csv(DATA_FILE, index=False)
+                    st.success(f"Transaction ID {selected_id} updated successfully!")
+                    st.rerun()
+                    
+                st.markdown("---")
+                st.subheader("🗑️ Option 2: Delete Record")
+                st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
