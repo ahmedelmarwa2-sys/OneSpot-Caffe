@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-# 1. إعدادات الحماية والأمان بالباسورد
+# 1. إعدادات الحماية والأمان بالباسورد (تتحقق من السيرفر السحابي)
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["password"]:
@@ -25,24 +25,21 @@ def check_password():
     else:
         return True
 
-# تشغيل البرنامج إذا كان الباسورد صحيحاً
+# تشغيل البرنامج بالكامل إذا كانت كلمة المرور صحيحة
 if check_password():
-          # [التصحيح النهائي للشعار] - عرض الشعار والعنوان بشكل متناسق جداً في سطر واحد
-    col_logo, col_title = st.columns([1, 5]) # تقسيم المساحة: جزء صغير للشعار و5 أجزاء للعنوان
+    
+    # [تعديل الشعار المحلي المباشر والمضمون 100%]
+    col_logo, col_title = st.columns([1, 6]) # تخصيص مساحة متناسقة (جزء للشعار و6 أجزاء للعنوان)
     
     with col_logo:
-        # قمنا بربط الصورة بالرابط المباشر الخام لحسابك على جيتهاب OneSpot-Caffe
-        logo_url = "https://githubusercontent.com"
-        
-        # عرض الصورة مع تفعيل ميزة التخطي في حال لم تكن الصورة مرفوعة بعد بنفس الاسم
+        # قراءة الصورة المحلية المرفوعة مباشرة من المستودع بجانب ملف الكود
         try:
-            st.image(logo_url, width=90) # يمكنك تعديل الرقم 90 للتحكم بحجم الشعار (تكبير/تصغير)
+            st.image("logo.png", width=90)
         except:
-            st.write("☕") # رمز مؤقت يظهر فقط إذا فشل الإنترنت في سحب الصورة
+            st.write("☕") # يظهر هذا الرمز التعبيري كبديل مؤقت في حال وجود خطأ في اسم الصورة
             
     with col_title:
         st.title("Onespot Cafe Financial Management System")
-
     
     DATA_FILE = "cafe_data.csv"
     
@@ -58,7 +55,7 @@ if check_password():
     df_all = load_data()
     st.markdown("---")
     
-    # القوائم المحددة الثابتة للبند
+    # القوائم المحددة الثابتة لبنود الحسابات
     INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
     EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
     
@@ -105,7 +102,7 @@ if check_password():
             
     st.markdown("---")
     
-    # 3. عرض التقارير والجداول المحدثة
+    # 3. عرض التقارير والجداول المحدثة والتفاعلية
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
@@ -141,7 +138,7 @@ if check_password():
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
             
-            # [التصحيح السحري هنا] أضفنا .iloc[0] لضمان جلب السطر كبيانات مفردة بدون أخطاء تجميعية
+            # جلب السطر المحدد بدقة كبيانات مفردة باستخدام .iloc لحل مشكلة التجميع السابقة
             row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
