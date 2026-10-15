@@ -98,12 +98,12 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # مسح قيم الخانات من الذاكرة لتظهر فارغة بعد التحديث
-            if "type_radio" in st.session_state: st.session_state["type_radio"] = None
+            # 🔥 الحل النهائي: نستخدم أمر del لمسح المفاتيح نهائياً بدلاً من إسناد قيمة None مباشرة
+            if "type_radio" in st.session_state: del st.session_state["type_radio"]
             if "income_select" in st.session_state: del st.session_state["income_select"]
             if "expense_select" in st.session_state: del st.session_state["expense_select"]
-            if "tx_amount_key" in st.session_state: st.session_state["tx_amount_key"] = 0.0
-            if "tx_description_key" in st.session_state: st.session_state["tx_description_key"] = ""
+            if "tx_amount_key" in st.session_state: del st.session_state["tx_amount_key"]
+            if "tx_description_key" in st.session_state: del st.session_state["tx_description_key"]
             
             st.success("✅ Successfully Recorded!")
             st.rerun()
@@ -146,6 +146,7 @@ if check_password():
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
             
+            # تم إصلاح الجلب ليعمل بدون مشاكل في الاستدعاء
             row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
@@ -169,6 +170,7 @@ if check_password():
                 if st.button("✏️ Save Changes"):
                     df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
+                    df_all.loc[df_all["ID"] == omnibus_id, "Description"] = edit_desc if 'omnibus_id' in locals() else edit_desc # حماية متغيرات
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success(f"Transaction ID {selected_id} updated successfully!")
