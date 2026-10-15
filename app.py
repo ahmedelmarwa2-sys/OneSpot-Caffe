@@ -28,7 +28,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns([1, 3, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -106,7 +106,7 @@ if check_password():
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
             net_profit_all = total_income_all - total_expense_all
             
-            # عرض لوحة التحكم التفاعلية لمدير الكافيه داخل الموقع كالمعتاد
+            # عرض لوحة التحكم التفاعلية كالمعتاد
             m_col1, m_col2, m_col3 = st.columns(3)
             m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
             m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
@@ -140,6 +140,7 @@ if check_password():
                 else:
                     st.write("No income recorded.")
                     inc_html_rows = "<tr><td colspan='3'>No income data.</td></tr>"
+                    
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
                 if not df_expenses.empty:
@@ -151,13 +152,13 @@ if check_password():
                     st.write("No expenses recorded.")
                     exp_html_rows = "<tr><td colspan='3'>No expense data.</td></tr>"
 
-            # إنشاء أسطر جدول الملخص الشهري بصيغة HTML للطباعة الموثوقة
+            # إنشاء أسطر جدول الملخص الشهري
             summary_html_rows = ""
             for _, row in monthly_summary.iterrows():
                 profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
                 summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
 
-            # [بناء وثيقة الطباعة الذكية والنظيفة بالكامل]
+            # وثيقة الطباعة الذكية والنظيفة
             report_html_document = f"""
             <html>
             <head>
