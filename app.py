@@ -182,6 +182,7 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
+                # [التعديل المحوري والنهائي للأمان]: استخدام .iloc[0] لحل المشكلة بالكامل وجلب السطر الفردي بنجاح
                 row_data = row_filtered.iloc[0]
                 st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
                 
@@ -210,4 +211,3 @@ if check_password():
                 with col2:
                     st.write("**Option B: Delete Selected Item**")
                     st.write("Warning: This action cannot be undone.")
-                    if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
