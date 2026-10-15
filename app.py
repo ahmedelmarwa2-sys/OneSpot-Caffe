@@ -27,8 +27,29 @@ def check_password():
 
 if check_password():
     
+    # [تنسيق الطباعة المتقدم] إخفاء النوافذ الجانبية وعناصر التحكم فقط، مع إبقاء التقرير والتحليل التفصيلي معاً
+    st.markdown(
+        """
+        <style>
+        @media print {
+            header, footer, .stSidebar, [data-testid="stHeader"], .stDeployButton, [data-testid="stDecoration"] {
+                display: none !important;
+            }
+            div[data-testid="stForm"], div[data-testid="stRadio"], .stTabs, hr {
+                display: none !important;
+            }
+            .print-container {
+                display: block !important;
+                width: 100% !important;
+            }
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns()
     
     with col_img:
         try:
@@ -143,18 +164,26 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
-        st.subheader("Monthly Performance (Profit & Loss)")
+        # احتواء منطقة التقارير والتحليل المالي التفصيلي بالكامل داخل حاوية طباعة واحدة
+        st.markdown("<div class='print-container'>", unsafe_allow_html=True)
         
+        title_col, print_btn_col = st.columns()
+        with title_col:
+            st.subheader("Monthly Performance (Profit & Loss)")
+        with print_btn_col:
+            st.markdown(
+                '<button onclick="window.print()" style="width:100%; padding:10px; background-color:#d4af37; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-family:\'Segoe UI\'; font-size:15px;">🖨️ طباعة التقرير والتحليل بالكامل</button>', 
+                unsafe_allow_html=True
+            )
+            
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
             df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
             
-            # حساب الإجماليات لعرضها في بطاقات علوية مخصصة للتقرير
             total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
             net_profit_all = total_income_all - total_expense_all
             
-            # عرض بطاقات ملخصة جذابة لمدير الكافيه
             m_col1, m_col2, m_col3 = st.columns(3)
             m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
             m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
@@ -162,7 +191,6 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # تجميع البيانات شهرياً واحتساب التقرير
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
                 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
@@ -172,17 +200,13 @@ if check_password():
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             
-            # عرض الجدول منسقاً وبسيطاً
             styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
             st.dataframe(styled_summary, use_container_width=True, hide_index=True)
             
-            # زر الطباعة السريع والمباشر (يعتمد على المتصفح مباشرة)
-            st.markdown(
-                '<button onclick="window.print()" style="width:100%; padding:12px; background-color:#d4af37; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-family:\'Segoe UI\'; font-size:16px;">🖨️ طباعة التقرير الشهري الحالي</button>', 
-                unsafe_allow_html=True
-            )
-            
+            # قسم التحليل المالي بالتاريخ (تم تضمينه ليصبح داخل حاوية الطباعة تلقائياً)
+            st.markdown("<br><hr style='border: 1px dashed #ccc;'><br>", unsafe_allow_html=True)
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
+            
             col_inc, col_exp = st.columns(2)
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
@@ -197,23 +221,3 @@ if check_password():
                 df_expenses = df_all[df_all['Type'] == 'Expense']
                 if not df_expenses.empty:
                     expense_breakdown = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(expense_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No expenses recorded.")
-        else:
-            st.info("No data recorded yet.")
-            
-    with tab2:
-        st.subheader("All Records Saved")
-        if not df_all.empty:
-            st.dataframe(df_all, use_container_width=True, hide_index=True)
-        else:
-            st.info("No data recorded yet.")
-
-    with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
-        if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
-            
-            st.markdown("### 🗑️ Delete Record")
-            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
