@@ -50,16 +50,12 @@ if check_password():
     # 2. نموذج الإدخال الثابت والمحمي بالـ Session State لمنع اختفاء البيانات
     st.subheader("📝 Record New Transaction")
     
-    # حفظ وتأمين حالة الاختيار في ذاكرة السيرفر
     if "form_type" not in st.session_state:
         st.session_state["form_type"] = None
 
     tx_date = st.date_input("Transaction Date:", datetime.date.today())
-    
-    # الراديو مبرمج ليحفظ حالته في الذاكرة اللحظية فوراً عند الضغط
     tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
     
-    # التبديل وعرض البنود بناءً على الذاكرة المستقرة
     if tx_type == "Income":
         tx_category = st.selectbox("Category البند:", INCOME_CATS, key="income_select")
     elif tx_type == "Expense":
@@ -71,7 +67,6 @@ if check_password():
     tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
     tx_description = st.text_input("Description / Notes (البيان):")
     
-    # زر حفظ المعاملة وضمان ترحيلها
     if st.button("💾 Save Transaction", type="primary"):
         if tx_type is None:
             st.error("⚠️ Please select Transaction Type (Income or Expense)!")
@@ -130,7 +125,9 @@ if check_password():
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-            row_data = df_all[df_all["ID"] == selected_id].iloc
+            
+            # [التصحيح السحري هنا] أضفنا .iloc[0] لضمان جلب السطر كبيانات مفردة بدون أخطاء تجميعية
+            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
             
