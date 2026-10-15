@@ -177,19 +177,13 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
+                # جلب القيم المباشرة لضمان عدم اختفاء الحقول أثناء التفاعل
                 curr_cat = str(row_filtered["Category"].values[0])
                 curr_type = str(row_filtered["Type"].values[0])
                 curr_amount = float(row_filtered["Amount"].values[0])
                 curr_desc = str(row_filtered["Description"].values[0])
                 
                 st.markdown(f"**Current Data:** Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}` | Note: `{curr_desc}`")
-                
-                # دلالة الحذف المباشرة (Callback) لتفادي مشاكل فقدان حالة الزر
-                def delete_callback(target_id):
-                    global df_all
-                    df_all = df_all[df_all["ID"] != target_id]
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.toast(f"✅ Record ID {target_id} deleted successfully!")
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -214,3 +208,7 @@ if check_password():
                         
                 with col2:
                     st.write("**Option B: Delete Selected Item**")
+                    st.write("Warning: This action cannot be undone.")
+                    
+                    # [الحل البرمجي القاطع]: زر الحذف المباشر بدون دوال خلفية معقدة لضمان بقائه نشطاً وثابتاً 100%
+                    if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
