@@ -179,7 +179,7 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [إصلاح حاسم وأكيد بنسبة 100%]: جلب السجل الفردي باستخدام الفهرس .iloc[0] الصافي لفتح كود رسم الواجهة مجدداً
+                # [التعديل الجوهري الحاسم]: إضافة [0] بعد iloc لاستخراج السطر كقيم مفردة وصافية تماماً لإصلاح الـ Bug نهائياً
                 row_data = row_filtered.iloc[0]
                 
                 curr_date = str(row_data["Date"])
