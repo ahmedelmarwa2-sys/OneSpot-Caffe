@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-# وظيفة الحماية - تبدأ من أول السطر تماماً
+# وظيفة الحماية 
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["password"]:
@@ -25,13 +25,11 @@ def check_password():
     else:
         return True
 
-# إذا فشل التحقق يتوقف البرنامج هنا فوراً لمنع أي إزاحة خاطئة للأسفل
 if not check_password():
     st.stop()
 
-# --- من هنا يبدأ البرنامج الرئيسي وهو غير مزاح تماماً (0 مسافة في البداية لضمان عدم حدوث الخطأ) ---
+# --- البرنامج الرئيسي ---
 
-# تنسيق الشعار والعنوان الرئيسي
 col_logo, col_title = st.columns([1, 6])
 with col_logo:
     try:
@@ -55,7 +53,6 @@ def load_data():
 df_all = load_data()
 st.markdown("---")
 
-# قوائم بنود الحسابات المحدثة للكافيه
 INCOME_CATS = [
     "Dine-in Sales (مبيعات الصالة)", 
     "Takeaway/Drive-thru (سفري وسيارة)", 
@@ -74,14 +71,17 @@ EXPENSE_CATS = [
     "Other Expense (مصروفات أخرى)"
 ]
 
-# 2. نموذج الإدخال مع ميزة التصفير التلقائي بعد الحفظ
-st.subheader("📝 Record New Transaction")
+# دالة التصفير الاحترافية التي تُستدعى فور نجاح الحفظ
+def clear_form_fields():
+    st.session_state["amount_input"] = 0.0
+    st.session_state["desc_input"] = ""
+    st.session_state["type_radio"] = None
 
-# تهيئة مفاتيح الـ Session State للحقول إذا لم تكن موجودة
-if "amount_val" not in st.session_state:
-    st.session_state["amount_val"] = 0.0
-if "desc_val" not in st.session_state:
-    st.session_state["desc_val"] = ""
+# تهيئة المتغيرات في حال أول ظهور للصفحة
+if "type_radio" not in st.session_state:
+    st.session_state["type_radio"] = None
+
+st.subheader("📝 Record New Transaction")
 
 tx_date = st.date_input("Transaction Date:", datetime.date.today())
 tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
@@ -94,8 +94,8 @@ else:
     st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
     tx_category = None
     
-tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", key="amount_input", value=st.session_state["amount_val"])
-tx_description = st.text_input("Description / Notes (البيان):", key="desc_input", value=st.session_state["desc_val"])
+tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", key="amount_input")
+tx_description = st.text_input("Description / Notes (البيان):", key="desc_input")
 
 if st.button("💾 Save Transaction", type="primary"):
     if tx_type is None:
@@ -116,11 +116,8 @@ if st.button("💾 Save Transaction", type="primary"):
         df_all = pd.concat([df_all, new_row], ignore_index=True)
         df_all.to_csv(DATA_FILE, index=False)
         
-        # تصفير وإعادة تعيين الحقول لتعود فارغة تماماً
-        del st.session_state["type_radio"] 
-        st.session_state["amount_val"] = 0.0
-        st.session_state["desc_val"] = ""
-        
+        # استدعاء دالة التصفير الفوري للحقول والواجهة
+        clear_form_fields()
         st.success("✅ Successfully Recorded!")
         st.rerun()
         
