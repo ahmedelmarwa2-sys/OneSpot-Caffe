@@ -49,7 +49,7 @@ if check_password():
         
         # القائمة المنسدلة الذكية: تتغير محتوياتها تلقائياً بناءً على اختيارك (إيرادات أم مصروفات)
         if tx_type == "Income":
-            tx_category = st.selectbox("Category البند:", ["Daily Sales", "Event Catering", "Other Income"])
+            tx_category = st.selectbox("Category البند:", ["مبيعات التيك أواي", "مبيعات الصالة", "App", "PS", "Kids", "Other Income"])
         else:
             tx_category = st.selectbox("Category البند:", ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"])
             
