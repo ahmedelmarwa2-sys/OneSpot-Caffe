@@ -29,7 +29,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns([1, 3, 1])
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -113,7 +113,6 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # حساب جدول الأداء الشهري
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({'Total Income': x[x['Type'] == 'Income']['Amount'].sum(), 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(), 'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()}), include_groups=False).reset_index()
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
@@ -141,12 +140,11 @@ if check_password():
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
                 if not df_expenses.empty:
-                    exp_data = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'})
-                    st.dataframe(exp_data, use_container_width=True, hide_index=True)
+                    exp_data = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}),
+                    st.dataframe(exp_data[0] if isinstance(exp_data, tuple) else exp_data, use_container_width=True, hide_index=True)
                 else:
                     st.write("No expenses recorded.")
             
-            # بناء التقرير المدمج الجديد للطباعة الفورية
             st.markdown("<br><hr>", unsafe_allow_html=True)
             st.subheader("📥 تصدير التقرير والتحليل للطباعة")
             
@@ -165,14 +163,14 @@ if check_password():
                 output.write("No income data recorded.\n")
                 
             output.write("\n\n3. BREAKDOWN: EXPENSE ANALYSIS (تحليل بنود المصروفات بالتاريخ):\n")
-            if not exp_data.empty:
-                exp_data.to_csv(output, index=False)
+            real_exp_data = exp_data[0] if isinstance(exp_data, tuple) else exp_data
+            if not real_exp_data.empty:
+                real_exp_data.to_csv(output, index=False)
             else:
                 output.write("No expense data recorded.\n")
                 
             combined_csv = output.getvalue().encode('utf-8-sig')
             
-            # زر التحميل الموحد الكبير والمميز لطباعة التقرير الشامل (تم إغلاق الأقواس بالكامل)
             st.download_button(
                 label="🖨️ تحميل تقرير الأداء المجمع + تحليل البنود بالتاريخ (Excel جاهز للطباعة)",
                 data=combined_csv,
@@ -186,3 +184,4 @@ if check_password():
             st.info("No data recorded yet.")
                 
     with tab2:
+        st.subheader("All Records Saved")
