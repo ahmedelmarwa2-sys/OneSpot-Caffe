@@ -28,7 +28,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns([1, 3, 1])
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -158,14 +158,12 @@ if check_password():
                 profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
                 summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
 
-            # وثيقة الطباعة الذكية والنظيفة
-            report_html_document = f"""
-            <html>
-            <head>
+            # [الحل الجذري] عزل كود الـ CSS في متغير نصي ناصع بدون f-string لتفادي خطأ السنتاكس تماماً
+            css_style = """
             <style>
-                body {{ font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #2c3e50; padding: 20px; }}
-                .print-header {{ text-align: center; border-bottom: 3px solid #d4af37; padding-bottom: 10px; margin-bottom: 30px; }}
-                .print-header h1 {{ margin: 0; color: #1a1a1a; font-size: 28px; }}
-                .print-header p {{ margin: 5px 0 0 0; color: #7f8c8d; font-size: 16px; }}
-                .metrics-box {{ display: flex; justify-content: space-between; margin-bottom: 30px; gap: 15px; }}
-                .metric-card {{ flex: 1; background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; }}
+                body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #2c3e50; padding: 20px; }
+                .print-header { text-align: center; border-bottom: 3px solid #d4af37; padding-bottom: 10px; margin-bottom: 30px; }
+                .print-header h1 { margin: 0; color: #1a1a1a; font-size: 28px; }
+                .print-header p { margin: 5px 0 0 0; color: #7f8c8d; font-size: 16px; }
+                .metrics-box { display: flex; justify-content: space-between; margin-bottom: 30px; gap: 15px; }
+                .metric-card { flex: 1; background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; }
