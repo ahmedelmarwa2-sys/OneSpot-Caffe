@@ -141,19 +141,34 @@ if check_password():
                 else:
                     st.write("No expenses recorded.")
             
-            # [الميزة البديلة والقطعية] توليد ملف التقرير بتنسيق نصي CSV/Excel نظيف وقابل للطباعة الفورية
-            st.markdown("<br>", unsafe_allow_html=True)
+            # قسم أزرار التصدير الذكية والمنفصلة
+            st.markdown("<br><hr>", unsafe_allow_html=True)
+            st.subheader("📥 تصدير وتحميل التقارير للطباعة")
             
-            # تحويل البيانات المجمعة إلى ملف CSV جاهز للتحميل والطباعة على إكسيل بضغطة زر
-            csv_data = df_all.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="📥 تحميل التقرير المالي والتحليلي بالكامل (Excel / CSV)",
-                data=csv_data,
-                file_name=f"OneSpot_Financial_Report_{datetime.date.today()}.csv",
-                mime="text/csv",
-                type="primary",
-                use_container_width=True
-            )
+            btn_col1, btn_col2 = st.columns(2)
+            
+            with btn_col1:
+                # إنشاء ملف يحتوي على الأرباح الشهرية المجمعة فقط
+                summary_csv = styled_summary.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📊 تحميل ملخص الأداء الشهري فقط (Excel)",
+                    data=summary_csv,
+                    file_name=f"OneSpot_Monthly_Summary_{datetime.date.today()}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+            with btn_col2:
+                # إنشاء ملف يحتوي على القيود اليومية المفصلة كاملة
+                full_csv = df_all.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📅 تحميل كشف القيود اليومية بالتفصيل (Excel)",
+                    data=full_csv,
+                    file_name=f"OneSpot_Daily_Transactions_{datetime.date.today()}.csv",
+                    mime="text/csv",
+                    type="primary",
+                    use_container_width=True
+                )
             
         else:
             st.info("No data recorded yet.")
@@ -169,6 +184,3 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
             if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
                 df_all[df_all["ID"] != selected_id].to_csv(DATA_FILE, index=False)
-                st.success(f"✅ Record #{selected_id} deleted successfully!")
-                st.rerun()
-        else: st.info("No data available to modify.")
