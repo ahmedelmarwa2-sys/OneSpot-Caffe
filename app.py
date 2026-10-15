@@ -30,7 +30,7 @@ if not check_password():
 
 # --- البرنامج الرئيسي ---
 
-col_logo, col_title = st.columns([1, 6])
+col_logo, col_title = st.columns()
 with col_logo:
     try:
         st.image("logo.png", width=90)
@@ -71,20 +71,27 @@ EXPENSE_CATS = [
     "Other Expense (مصروفات أخرى)"
 ]
 
-# دالة التصفير الاحترافية التي تُستدعى فور نجاح الحفظ
-def clear_form_fields():
-    st.session_state["amount_input"] = 0.0
-    st.session_state["desc_input"] = ""
-    st.session_state["type_radio"] = None
-
-# تهيئة المتغيرات في حال أول ظهور للصفحة
-if "type_radio" not in st.session_state:
-    st.session_state["type_radio"] = None
+# تهيئة مخازن القيم الافتراضية لمنع الأخطاء التكرارية تزامناً مع الحفظ
+if "amt_state_val" not in st.session_state:
+    st.session_state["amt_state_val"] = 0.0
+if "desc_state_val" not in st.session_state:
+    st.session_state["desc_state_val"] = ""
 
 st.subheader("📝 Record New Transaction")
 
 tx_date = st.date_input("Transaction Date:", datetime.date.today())
-tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
+
+# استخدام حيلة بسيطة لـ Radio: استخدام مفتاح ديناميكي يتغير عند الرغبة في التصفير الشامل
+if "radio_reset_key" not in st.session_state:
+    st.session_state["radio_reset_key"] = 0
+
+tx_type = st.radio(
+    "Transaction Type:", 
+    ["Income", "Expense"], 
+    index=None, 
+    horizontal=True, 
+    key=f"type_radio_{st.session_state['radio_reset_key']}"
+)
 
 if tx_type == "Income":
     tx_category = st.selectbox("Category البند:", INCOME_CATS, key="income_select")
@@ -94,8 +101,9 @@ else:
     st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
     tx_category = None
     
-tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", key="amount_input")
-tx_description = st.text_input("Description / Notes (البيان):", key="desc_input")
+# ربط القيمة بالحقول الرسومية عبر الـ state_val الداخلي 
+tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", value=st.session_state["amt_state_val"])
+tx_description = st.text_input("Description / Notes (البيان):", value=st.session_state["desc_state_val"])
 
 if st.button("💾 Save Transaction", type="primary"):
     if tx_type is None:
@@ -116,8 +124,11 @@ if st.button("💾 Save Transaction", type="primary"):
         df_all = pd.concat([df_all, new_row], ignore_index=True)
         df_all.to_csv(DATA_FILE, index=False)
         
-        # استدعاء دالة التصفير الفوري للحقول والواجهة
-        clear_form_fields()
+        # التصفير الآمن للقيم وتحديث واجهة المستخدم
+        st.session_state["amt_state_val"] = 0.0
+        st.session_state["desc_state_val"] = ""
+        st.session_state["radio_reset_key"] += 1 # تغيير المفتاح يجبر الـ Radio على العودة إلى الوضع None فوراً
+        
         st.success("✅ Successfully Recorded!")
         st.rerun()
         
@@ -173,7 +184,7 @@ with tab3:
     st.subheader("🛠️ Modify or Remove a Transaction")
     if not df_all.empty:
         selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-        row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+        row_data = df_all[df_all["ID"] == selected_id].iloc[0] # تصحيح استدعاء السطر لإرجاع السجل الفعلي
         
         st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
         
