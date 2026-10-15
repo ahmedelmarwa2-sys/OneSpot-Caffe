@@ -42,8 +42,8 @@
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # [التعديل الجديد]: تصفير وإعادة تعيين الحقول في السيرفر قبل إعادة التحميل
-            del st.session_state["type_radio"] # لإعادة اختيار نوع المعاملة إلى None
+            # تصفير وإعادة تعيين الحقول في السيرفر قبل إعادة التحميل
+            del st.session_state["type_radio"] 
             st.session_state["amount_val"] = 0.0
             st.session_state["desc_val"] = ""
             
