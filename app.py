@@ -46,6 +46,8 @@ if check_password():
             df = pd.read_csv(DATA_FILE)
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
+            # تأمين تحويل المعرفات إلى أرقام صحيحة واضحة لضمان ثبات المفاتيح
+            df["ID"] = df["ID"].astype(int)
             return df
         else:
             return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
@@ -91,7 +93,7 @@ if check_password():
             new_row = pd.DataFrame([{
                 "ID": next_id,
                 "Date": str(tx_date), 
-                "Month_No": tx_date.month, 
+                "Month_No": int(tx_date.month), 
                 "Category": tx_category, 
                 "Type": tx_type, 
                 "Amount": tx_amount, 
@@ -100,7 +102,7 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # تفعيل التصفير الفوري
+            # تفعيل تصفير النموذج
             reset_form_fields()
             st.success("✅ Successfully Recorded!")
             st.rerun()
@@ -141,10 +143,12 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_action")
+            # استخدام قائمة من النصوص لضمان ثبات المفاتيح في واجهة المقارنة
+            id_list = df_all["ID"].tolist()
+            selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # 🔥 الإصلاح النهائي والمضمون: إضافة [0] لاستخراج بيانات السطر الفعلي بشكل صحيح لمنع أخطاء الأزرار تفادياً للـ Crash
-            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+            # تصحيح iloc بإضافة الأقواس المربعة لضمان استخراج السطر الفردي بأمان
+            row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
             
@@ -160,14 +164,14 @@ if check_password():
                 except ValueError:
                     default_idx = 0
                     
-                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
-                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_edit_{selected_id}")
+                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_edit_{selected_id}")
+                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_edit_{selected_id}")
                 
-                if st.button("✏️ Save Changes", key=f"save_edit_{selected_id}"):
-                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
-                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+                if st.button("✏️ Save Changes", key=f"save_btn_{selected_id}"):
+                    df_all.loc[df_all["ID"] == int(selected_id), "Category"] = edit_cat
+                    df_all.loc[df_all["ID"] == int(selected_id), "Amount"] = edit_amount
+                    df_all.loc[df_all["ID"] == int(selected_id), "Description"] = edit_desc
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success(f"Transaction ID {selected_id} updated successfully!")
                     st.rerun()
@@ -176,8 +180,8 @@ if check_password():
                 st.write("**Option B: Delete Selected Item**")
                 st.warning("⚠️ Warning: This action cannot be undone.")
                 
-                if st.button("🗑️ Delete Transaction", type="destructive", key=f"btn_del_{selected_id}"):
-                    df_all = df_all[df_all["ID"] != selected_id]
+                if st.button("🗑️ Delete Transaction", type="destructive", key=f"delete_btn_{selected_id}"):
+                    df_all = df_all[df_all["ID"] != int(selected_id)]
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success(f"Transaction ID {selected_id} deleted successfully!")
                     st.rerun()
