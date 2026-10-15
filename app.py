@@ -168,7 +168,6 @@ if check_password():
     with tab2:
         st.subheader("All Records Saved")
         if not df_all.empty:
-            # [تعديل هنا]: عرض الجدول مباشرة بدون إضافة عمود المسلسل S.N
             st.dataframe(df_all, use_container_width=True, hide_index=True)
         else:
             st.info("No data recorded yet.")
@@ -180,11 +179,12 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                curr_date = str(row_filtered["Date"].values)
-                curr_cat = str(row_filtered["Category"].values)
-                curr_type = str(row_filtered["Type"].values)
-                curr_amount = float(row_filtered["Amount"].values)
-                curr_desc = str(row_filtered["Description"].values)
+                # [إصلاح سحري هنا بـ [0]]: سحب العنصر الأول الصافي لحل مشكلة الـ TypeError نهائياً وبثبات مطلق
+                curr_date = str(row_filtered["Date"].values[0])
+                curr_cat = str(row_filtered["Category"].values[0])
+                curr_type = str(row_filtered["Type"].values[0])
+                curr_amount = float(row_filtered["Amount"].values[0])
+                curr_desc = str(row_filtered["Description"].values[0])
                 
                 st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Date: `{curr_date}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
                 st.markdown("---")
