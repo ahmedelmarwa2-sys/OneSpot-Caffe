@@ -168,7 +168,13 @@ if check_password():
             
     with tab2:
         st.subheader("All Records Saved")
-        st.dataframe(df_all, use_container_width=True, hide_index=True)
+        if not df_all.empty:
+            # توليد رقم مسلسل مرئي يبدأ من 1 بشكل ديناميكي دون الكتابة في ملف الـ CSV الرئيسي
+            df_display = df_all.copy()
+            df_display.insert(0, "S.N (مسلسل)", range(1, len(df_display) + 1))
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+        else:
+            st.info("No data recorded yet.")
 
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
@@ -209,7 +215,3 @@ if check_password():
                     st.write("**Option B: Delete Selected Item**")
                     st.write("Warning: This action cannot be undone.")
                     
-                    # تم إصلاح المسافة البادئة وضبط سطر الحذف ليعمل بشكل فوري ومستقر 100%
-                    if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
-                        df_updated = df_all[df_all["ID"] != selected_id]
-                        df_updated.to_csv(DATA_FILE, index=False)
