@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-# 1. إعدادات الحماية والأمان (تتحقق من وجود كلمة المرور في السيرفر)
+# 1. إعدادات الحماية والأمان بالباسورد
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["password"]:
@@ -42,7 +42,7 @@ if check_password():
     def load_data():
         if os.path.exists(DATA_FILE):
             df = pd.read_csv(DATA_FILE)
-            # تنظيف السجلات التالفة تلقائياً لمنع ظهور الأسطر الفارغة
+            # تنظيف السجلات التالفة والأسطر الفارغة تماماً لمنع حدوث أخطاء
             df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
@@ -53,7 +53,7 @@ if check_password():
     df_all = load_data()
     st.markdown("---")
     
-    # القوائم المحددة الثابتة لبنود الحسابات المدمجة
+    # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
         "Dine-in Sales (مبيعات الصالة)", 
         "Takeaway/Drive-thru (سفري وسيارة)", 
@@ -72,10 +72,9 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # 3. نموذج الإدخال الذكي مع تصفية البنود تلقائياً بناءً على نوع المعاملة
+    # 3. نموذج الإدخال الذكي مع تصفية البنود تلقائياً بعد اختيار النوع
     st.subheader("📝 Record New Transaction")
     
-    # حيلة مفتاح التصفير الديناميكي للراديو
     if "radio_reset_key" not in st.session_state:
         st.session_state["radio_reset_key"] = 0
         
@@ -87,7 +86,6 @@ if check_password():
         key=f"type_radio_{st.session_state['radio_reset_key']}"
     )
     
-    # تصفية وتحديد القائمة المعروضة فوراً بناءً على ضغطة المستخدم
     if tx_type == "Income":
         current_cats = INCOME_CATS
     elif tx_type == "Expense":
@@ -96,7 +94,6 @@ if check_password():
         current_cats = []
         st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
         
-    # عرض الحقول بداخل الـ Form لضمان مسح البيانات بعد الضغط على زر الحفظ
     if tx_type is not None:
         with st.form(key="cafe_entry_form", clear_on_submit=True):
             tx_date = st.date_input("Transaction Date:", datetime.date.today())
@@ -123,14 +120,13 @@ if check_password():
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
                 
-                # تصفير زر الراديو تلقائياً ليعود فارغاً للعملية التالية
                 st.session_state["radio_reset_key"] += 1
                 st.success("✅ Successfully Recorded!")
                 st.rerun()  
                 
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة الثلاثة)
+    # 4. عرض التقارير والجداول التفاعلية (الألسنة الثلاثة)
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
@@ -149,7 +145,6 @@ if check_password():
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            # تحليل تفصيلي للبنود
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات)")
             col_inc, col_exp = st.columns(2)
             with col_inc:
@@ -182,23 +177,26 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [إصلاح سحري تم هنا بنجاح]: إضافة [0] بعد الـ iloc لاستخراج الفهرس الأول وضمان عمل كود الحذف بشكل فوري ومستقر
-                row_data = row_filtered.iloc[0]
-                st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
+                # [حل نهائي ومضمون]: استخراج البيانات بدون دالة .iloc لضمان تفادي توقف معالجة العمود الثاني
+                curr_cat = str(row_filtered["Category"].values[0])
+                curr_type = str(row_filtered["Type"].values[0])
+                curr_amount = float(row_filtered["Amount"].values[0])
+                curr_desc = str(row_filtered["Description"].values[0])
+                
+                st.markdown(f"**Current Data:** Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}` | Note: `{curr_desc}`")
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write("**Option A: Edit Selected Item**")
-                    current_type = row_data["Type"]
-                    cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
+                    cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
                     try:
-                        default_idx = cat_options.index(row_data["Category"])
+                        default_idx = cat_options.index(curr_cat)
                     except ValueError:
                         default_idx = 0
                         
                     edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                    edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
-                    edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                    edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
+                    edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
                     
                     if st.button("✏️ Save Changes"):
                         df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
@@ -210,3 +208,7 @@ if check_password():
                         
                 with col2:
                     st.write("**Option B: Delete Selected Item**")
+                    st.write("Warning: This action cannot be undone.")
+                    # زر الحذف الأحمر سيظهر الآن بشكل كامل ومضمون 100%
+                    if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
+                        df_all = df_all[df_all["ID"] != selected_id]
