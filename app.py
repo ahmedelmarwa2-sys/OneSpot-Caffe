@@ -72,7 +72,7 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # 3. نموذج الإدخال (Form المصفّر الذاتي المستوحى من الكود الثالث)
+    # 3. نموذج الإدخال (Form المصفّر الذاتي المستوحى من الأكواد السابقة)
     st.subheader("📝 Record New Transaction")
     
     with st.form(key="cafe_entry_form", clear_on_submit=True):
