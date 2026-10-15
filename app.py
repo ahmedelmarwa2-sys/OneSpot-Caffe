@@ -27,7 +27,7 @@ def check_password():
 
 # تشغيل البرنامج إذا كان الباسورد صحيحاً
 if check_password():
-    st.title("☕ Cafe Financial Management System")
+    st.title("☕ One☕spot Cafe Financial Management System")
     
     DATA_FILE = "cafe_data.csv"
     
