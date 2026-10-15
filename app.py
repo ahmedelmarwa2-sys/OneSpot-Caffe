@@ -148,6 +148,20 @@ if check_password():
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
             df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
             
+            # حساب الإجماليات لعرضها في بطاقات علوية مخصصة للتقرير
+            total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
+            total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
+            net_profit_all = total_income_all - total_expense_all
+            
+            # عرض بطاقات ملخصة جذابة لمدير الكافيه
+            m_col1, m_col2, m_col3 = st.columns(3)
+            m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
+            m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
+            m_col3.metric(label="Net Profit (صافي الربح الكلي)", value=f"${net_profit_all:,.2f}", delta=f"${net_profit_all:,.2f}")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # تجميع البيانات شهرياً واحتساب التقرير
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
                 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
@@ -156,7 +170,19 @@ if check_password():
             
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
-            st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
+            
+            # [تنسيق احترافي] استخدام خاصية التلوين التلقائي لخانة صافي الربح داخل الجدول
+            styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
+            
+            st.dataframe(
+                styled_summary.style.format({
+                    'Total Income': '${:,.2f}',
+                    'Total Expense': '${:,.2f}',
+                    'Net Profit': '${:,.2f}'
+                }).map(lambda val: 'color: #27ae60; font-weight: bold;' if val > 0 else 'color: #c0392b; font-weight: bold;', subset=['Net Profit']),
+                use_container_width=True, 
+                hide_index=True
+            )
             
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             col_inc, col_exp = st.columns(2)
@@ -193,10 +219,3 @@ if check_password():
             
             st.markdown("### 🗑️ Delete Record")
             st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
-            if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
-                df_updated = df_all[df_all["ID"] != selected_id]
-                df_updated.to_csv(DATA_FILE, index=False)
-                st.success(f"✅ Record #{selected_id} deleted successfully!")
-                st.rerun()
-        else:
-            st.info("No data available to modify.")
