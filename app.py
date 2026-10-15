@@ -175,23 +175,28 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-            row_filtered = df_all[df_all["ID"] == selected_id]
+            # جعل اختيار المعرف علني ومستقل تماماً لضمان رسم الحقول دوماً
+            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
             
+            # زر الحذف العلني المستقل مفرود في الأعلى ليكون متاحاً أمامك دائماً دون أي شروط مخفية
+            st.markdown("### 🗑️ Delete Record")
+            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
+            if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
+                df_updated = df_all[df_all["ID"] != selected_id]
+                df_updated.to_csv(DATA_FILE, index=False)
+                st.error(f"Transaction ID {selected_id} deleted successfully!")
+                st.rerun()
+                
+            st.markdown("---")
+            st.markdown("### ✏️ Edit & Update Record")
+            row_filtered = df_all[df_all["ID"] == selected_id]
             if not row_filtered.empty:
-                # [الإصلاح النهائي والقطعي بنسبة 100%]: جلب السجل الفردي باستخدام الفهرس .iloc[0] الصافي لفتح كود رسم الواجهة مجدداً
-                row_data = row_filtered.iloc[0]
+                # استخراج البيانات باستخدام الفهرس المباشر لتعبئة حقول التعديل
+                curr_cat = str(row_filtered["Category"].values[0])
+                curr_type = str(row_filtered["Type"].values[0])
+                curr_amount = float(row_filtered["Amount"].values[0])
+                curr_desc = str(row_filtered["Description"].values[0])
                 
-                curr_date = str(row_data["Date"])
-                curr_cat = str(row_data["Category"])
-                curr_type = str(row_data["Type"])
-                curr_amount = float(row_data["Amount"])
-                curr_desc = str(row_data["Description"])
-                
-                st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Date: `{curr_date}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
-                st.markdown("---")
-                
-                st.subheader("✏️ Option 1: Edit & Update Record")
                 cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
                 try:
                     default_idx = cat_options.index(curr_cat)
@@ -206,11 +211,3 @@ if check_password():
                     df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.success(f"Transaction ID {selected_id} updated successfully!")
-                    st.rerun()
-                    
-                st.markdown("---")
-                st.subheader("🗑️ Option 2: Delete Record")
-                st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
-                
