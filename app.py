@@ -3,10 +3,10 @@ import pandas as pd
 import datetime
 import os
 
-# 1. إعدادات الحماية والأمان بالباسورد
+# 1. إعدادات الحماية والأمان بالباسورد (نسخة التشغيل المحلي)
 def check_password():
     def password_entered():
-        if st.session_state["password"] == st.secrets["password"]:
+        if st.session_state["password"] == "1234":  
             st.session_state["password_correct"] = True
             del st.session_state["password"]  
         else:
@@ -14,11 +14,11 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
-        st.title("🔒 OneSpot Cafe System - Secure Login")
+        st.title("🔒 Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.title("🔒 OneSpot Cafe System - Secure Login")
+        st.title("🔒 Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         st.error("❌ Incorrect password. Please try again.")
         return False
@@ -27,6 +27,36 @@ def check_password():
 
 if check_password():
     
+    # [تنسيق الطباعة الذكي] حقن أكواد CSS مخصصة لإخفاء العناصر غير الضرورية أثناء الطباعة وتنسيق الجداول
+    st.markdown(
+        """
+        <style>
+        @media print {
+            /* إخفاء عناصر التحكم وأزرار ستريمليت الجانبية والعلوية */
+            header, footer, .stSidebar, [data-testid="stHeader"], .stDeployButton, [data-testid="stDecoration"] {
+                display: none !important;
+            }
+            /* إخفاء نموذج الإدخال والألسنة الأخرى أثناء طباعة التقرير */
+            div[data-testid="stForm"], div[data-testid="stRadio"], .stTabs, hr {
+                display: none !important;
+            }
+            /* إظهار محتوى التقرير فقط المُراد طباعته بشكل كامل */
+            .print-area {
+                display: block !important;
+                width: 100% !important;
+            }
+            /* تحسين مظهر البطاقات الرقمية في الطباعة */
+            div[data-testid="stMetricValue"] {
+                font-size: 24px !important;
+                font-weight: bold !important;
+                color: #000000 !important;
+            }
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
     col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
@@ -71,9 +101,9 @@ if check_password():
     
     # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
-       
+        "Takeaway (سفره وسيارة)", 
         "Daily Sales (المبيعات اليوميه)", 
-        
+        "PS (play staion)",
         "Other Income (إيرادات أخرى)"
     ]
     EXPENSE_CATS = [
@@ -143,7 +173,20 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
-        st.subheader("Monthly Performance (Profit & Loss)")
+        # احتواء التقرير بالكامل داخل حاوية للطباعة النظيفة
+        st.markdown("<div class='print-area'>", unsafe_allow_html=True)
+        
+        # إنشاء سطر يحتوي على العنوان وزر الطباعة بجانبه مباشرة بشكل أنيق
+        title_col, print_btn_col = st.columns([4, 1])
+        with title_col:
+            st.subheader("Monthly Performance (Profit & Loss)")
+        with print_btn_col:
+            # زر الطباعة السحرية؛ يستدعي أمر الطباعة الخاص بالمتصفح مباشرة
+            st.markdown(
+                '<button onclick="window.print()" style="width:100%; padding:8px; background-color:#d4af37; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-family:\'Segoe UI\';">🖨️ Print Report</button>', 
+                unsafe_allow_html=True
+            )
+            
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
             df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
@@ -171,7 +214,7 @@ if check_password():
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             
-            # [تنسيق احترافي] استخدام خاصية التلوين التلقائي لخانة صافي الربح داخل الجدول
+            # استخدام خاصية التلوين التلقائي لخانة صافي الربح داخل الجدول
             styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
             
             st.dataframe(
@@ -185,37 +228,3 @@ if check_password():
             )
             
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
-            col_inc, col_exp = st.columns(2)
-            with col_inc:
-                st.write("**Income Analysis (الإيرادات بالتاريخ)**")
-                df_inc = df_all[df_all['Type'] == 'Income']
-                if not df_inc.empty:
-                    inc_breakdown = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(inc_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No income recorded.")
-            with col_exp:
-                st.write("**Expense Analysis (المصروفات بالتاريخ)**")
-                df_expenses = df_all[df_all['Type'] == 'Expense']
-                if not df_expenses.empty:
-                    expense_breakdown = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(expense_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No expenses recorded.")
-        else:
-            st.info("No data recorded yet.")
-            
-    with tab2:
-        st.subheader("All Records Saved")
-        if not df_all.empty:
-            st.dataframe(df_all, use_container_width=True, hide_index=True)
-        else:
-            st.info("No data recorded yet.")
-
-    with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
-        if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
-            
-            st.markdown("### 🗑️ Delete Record")
-            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
