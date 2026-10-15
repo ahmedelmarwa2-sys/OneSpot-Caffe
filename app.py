@@ -14,11 +14,11 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
-        st.title("🔒 Cafe System - Secure Login")
+        st.title("🔒 OneSpot Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.title("🔒 Cafe System - Secure Login")
+        st.title("🔒 OneSpot Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         st.error("❌ Incorrect password. Please try again.")
         return False
