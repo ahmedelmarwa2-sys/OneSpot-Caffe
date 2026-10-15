@@ -27,29 +27,8 @@ def check_password():
 
 if check_password():
     
-    # [تنسيق الطباعة المتقدم] عند الطباعة، سيتم إخفاء النماذج والألسنة لطباعة التقرير والتحليل فقط بشكل رسمي
-    st.markdown(
-        """
-        <style>
-        @media print {
-            header, footer, .stSidebar, [data-testid="stHeader"], .stDeployButton, [data-testid="stDecoration"] {
-                display: none !important;
-            }
-            div[data-testid="stForm"], div[data-testid="stRadio"], .stTabs, hr {
-                display: none !important;
-            }
-            .print-area {
-                display: block !important;
-                width: 100% !important;
-            }
-        }
-        </style>
-        """, 
-        unsafe_allow_html=True
-    )
-
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns([1, 3, 1])
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -116,39 +95,18 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
 
     with tab1:
-        st.markdown("<div class='print-area'>", unsafe_allow_html=True)
-        
-        title_col, btn_col = st.columns([3, 1])
-        with title_col:
-            st.subheader("Monthly Performance (Profit & Loss)")
-        with btn_col:
-            # [الحل المضمون والجذري للطباعة المباشرة] استخدام كود HTML خارجي لكسر حماية السيرفر
-            st.components.v1.html(
-                """
-                <button onclick="window.parent.print()" style="
-                    width: 100%; 
-                    padding: 10px; 
-                    background-color: #d4af37; 
-                    color: white; 
-                    border: none; 
-                    border-radius: 6px; 
-                    font-weight: bold; 
-                    cursor: pointer; 
-                    font-family: 'Segoe UI', sans-serif; 
-                    font-size: 14px;
-                ">🖨️ طباعة التقرير الحالي</button>
-                """,
-                height=50
-            )
+        st.subheader("Monthly Performance (Profit & Loss)")
             
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
             df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
             
+            # احتساب الإجماليات والتقارير
             total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
             net_profit_all = total_income_all - total_expense_all
             
+            # عرض لوحة التحكم التفاعلية لمدير الكافيه داخل الموقع كالمعتاد
             m_col1, m_col2, m_col3 = st.columns(3)
             m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
             m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
@@ -162,35 +120,51 @@ if check_password():
             
             st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            # قسم التحليل المالي بالتاريخ (مدمج داخل منطقة الطباعة التلقائية)
             st.markdown("<br><hr style='border: 1px dashed #ccc;'><br>", unsafe_allow_html=True)
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             
             col_inc, col_exp = st.columns(2)
+            df_inc = df_all[df_all['Type'] == 'Income']
+            df_expenses = df_all[df_all['Type'] == 'Expense']
+            
+            inc_html_rows = ""
+            exp_html_rows = ""
+            
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
-                df_inc = df_all[df_all['Type'] == 'Income']
                 if not df_inc.empty:
-                    st.dataframe(df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    inc_grouped = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(inc_grouped.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    for _, row in inc_grouped.iterrows():
+                        inc_html_rows += f"<tr><td>{row['Date']}</td><td>{row['Category']}</td><td>${row['Amount']:,.2f}</td></tr>"
                 else:
                     st.write("No income recorded.")
+                    inc_html_rows = "<tr><td colspan='3'>No income data.</td></tr>"
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
-                df_expenses = df_all[df_all['Type'] == 'Expense']
                 if not df_expenses.empty:
-                    st.dataframe(df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    exp_grouped = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(exp_grouped.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    for _, row in exp_grouped.iterrows():
+                        exp_html_rows += f"<tr><td>{row['Date']}</td><td>{row['Category']}</td><td>${row['Amount']:,.2f}</td></tr>"
                 else:
                     st.write("No expenses recorded.")
-        else:
-            st.info("No data recorded yet.")
-        st.markdown("</div>", unsafe_allow_html=True)
-                
-    with tab2:
-        st.subheader("All Records Saved")
-        if not df_all.empty: st.dataframe(df_all, use_container_width=True, hide_index=True)
-        else: st.info("No data recorded yet.")
+                    exp_html_rows = "<tr><td colspan='3'>No expense data.</td></tr>"
 
-    with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
-        if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
+            # إنشاء أسطر جدول الملخص الشهري بصيغة HTML للطباعة الموثوقة
+            summary_html_rows = ""
+            for _, row in monthly_summary.iterrows():
+                profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
+                summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
+
+            # [بناء وثيقة الطباعة الذكية والنظيفة بالكامل]
+            report_html_document = f"""
+            <html>
+            <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #2c3e50; padding: 20px; }}
+                .print-header {{ text-align: center; border-bottom: 3px solid #d4af37; padding-bottom: 10px; margin-bottom: 30px; }}
+                .print-header h1 {{ margin: 0; color: #1a1a1a; font-size: 28px; }}
+                .print-header p {{ margin: 5px 0 0 0; color: #7f8c8d; font-size: 16px; }}
+                .metrics-box {{ display: flex; justify-content: space-between; margin-bottom: 30px; gap: 15px; }}
+                .metric-card {{ flex: 1; background: #f8f9fa; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; }}
