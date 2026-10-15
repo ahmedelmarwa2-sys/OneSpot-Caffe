@@ -143,7 +143,7 @@ if check_password():
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_action")
             
-            # تم الإصلاح هنا بإضافة [0] لضمان جلب السطر ككائن صحيح ومنع أخطاء العناصر المتعددة
+            # 🔥 الإصلاح النهائي والمضمون: إضافة [0] لاستخراج بيانات السطر الفعلي بشكل صحيح لمنع أخطاء الأزرار تفادياً للـ Crash
             row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
