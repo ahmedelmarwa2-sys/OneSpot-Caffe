@@ -27,27 +27,6 @@ def check_password():
 
 if check_password():
     
-    # [تنسيق الطباعة التلقائي] عند ضغط زر الطباعة، المتصفح تلقائياً سيخفي الأزرار والنماذج ويطبع التقرير والتحليل فقط
-    st.markdown(
-        """
-        <style>
-        @media print {
-            header, footer, .stSidebar, [data-testid="stHeader"], .stDeployButton, [data-testid="stDecoration"] {
-                display: none !important;
-            }
-            div[data-testid="stForm"], div[data-testid="stRadio"], .stTabs, hr, button {
-                display: none !important;
-            }
-            .print-container {
-                display: block !important;
-                width: 100% !important;
-            }
-        }
-        </style>
-        """, 
-        unsafe_allow_html=True
-    )
-
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
     col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     with col_img:
@@ -116,12 +95,7 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
 
     with tab1:
-        st.markdown("<div class='print-container'>", unsafe_allow_html=True)
-        title_col, btn_col = st.columns([3, 1])
-        with title_col:
-            st.subheader("Monthly Performance (Profit & Loss)")
-        with btn_col:
-            st.markdown('<button onclick="window.print()" style="width:100%; padding:10px; background-color:#d4af37; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-family:\'Segoe UI\'; font-size:14px;">🖨️ طباعة التقرير والتحليل</button>', unsafe_allow_html=True)
+        st.subheader("Monthly Performance (Profit & Loss)")
             
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
@@ -142,28 +116,47 @@ if check_password():
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             
-            st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
+            styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
+            st.dataframe(styled_summary, use_container_width=True, hide_index=True)
+            
             st.markdown("<br><hr style='border: 1px dashed #ccc;'><br>", unsafe_allow_html=True)
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             
             col_inc, col_exp = st.columns(2)
+            df_inc = df_all[df_all['Type'] == 'Income']
+            df_expenses = df_all[df_all['Type'] == 'Expense']
+            
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
-                df_inc = df_all[df_all['Type'] == 'Income']
                 if not df_inc.empty:
-                    st.dataframe(df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    inc_data = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(inc_data.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
                 else:
                     st.write("No income recorded.")
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
-                df_expenses = df_all[df_all['Type'] == 'Expense']
                 if not df_expenses.empty:
-                    st.dataframe(df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index().rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    exp_data = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(exp_data.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
                 else:
                     st.write("No expenses recorded.")
+            
+            # [الميزة البديلة والقطعية] توليد ملف التقرير بتنسيق نصي CSV/Excel نظيف وقابل للطباعة الفورية
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # تحويل البيانات المجمعة إلى ملف CSV جاهز للتحميل والطباعة على إكسيل بضغطة زر
+            csv_data = df_all.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 تحميل التقرير المالي والتحليلي بالكامل (Excel / CSV)",
+                data=csv_data,
+                file_name=f"OneSpot_Financial_Report_{datetime.date.today()}.csv",
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
+            )
+            
         else:
             st.info("No data recorded yet.")
-        st.markdown("</div>", unsafe_allow_html=True)
                 
     with tab2:
         st.subheader("All Records Saved")
