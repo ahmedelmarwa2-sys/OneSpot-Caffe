@@ -182,16 +182,15 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # تنظيف الكلمات الصافية منعاً لتعليق القوائم المنسدلة
-                curr_cat = str(row_filtered["Category"].values[0])
-                curr_type = str(row_filtered["Type"].values[0])
-                curr_amount = float(row_filtered["Amount"].values[0])
-                curr_desc = str(row_filtered["Description"].values[0])
+                # [التصحيح البرمجي النهائي الحاسم]: استخراج قيم نصوص مجردة وصافية تماماً بدون التنسيق الصامت للمصفوفات
+                curr_cat = str(row_filtered["Category"].iloc[0])
+                curr_type = str(row_filtered["Type"].iloc[0])
+                curr_amount = float(row_filtered["Amount"].iloc[0])
+                curr_desc = str(row_filtered["Description"].iloc[0])
                 
                 st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
                 st.markdown("---")
                 
-                # [إعادة هيكلة كاملة للتصميم] فصل الخيارات في أسطر مستقلة واضحة 100% لحل مشكلة اختفاء الأزرار
                 st.subheader("✏️ Option 1: Edit & Update Record")
                 cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
                 try:
@@ -213,3 +212,5 @@ if check_password():
                     
                 st.markdown("---")
                 st.subheader("🗑️ Option 2: Delete Record")
+                st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
+                
