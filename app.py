@@ -27,7 +27,17 @@ def check_password():
 
 # تشغيل البرنامج إذا كان الباسورد صحيحاً
 if check_password():
-    st.title("☕ Onespot Cafe Financial Management System")
+        # [تعديل الشعار] - عرض شعار الكافيه والعنوان بشكل متناسق في الأعلى
+    col_logo, col_title = st.columns([1, 5]) # تقسيم المساحة لعمودين (عمود صغير للشعار وعمود كبير للعنوان)
+    
+    with col_logo:
+        # إذا كانت الصورة مرفوعة باسم logo.png في الـ GitHub سيقرأها السيرفر مباشرة
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=100) # يمكنك زيادة أو تقليل الرقم 100 لتكبير وتصغير الشعار
+            
+    with col_title:
+        st.title("Onespot Cafe Financial Management System")
+
     
     DATA_FILE = "cafe_data.csv"
     
