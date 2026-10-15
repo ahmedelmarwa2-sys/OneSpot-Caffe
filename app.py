@@ -177,7 +177,6 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # جلب القيم المباشرة لضمان عدم اختفاء الحقول أثناء التفاعل
                 curr_cat = str(row_filtered["Category"].values[0])
                 curr_type = str(row_filtered["Type"].values[0])
                 curr_amount = float(row_filtered["Amount"].values[0])
@@ -210,5 +209,7 @@ if check_password():
                     st.write("**Option B: Delete Selected Item**")
                     st.write("Warning: This action cannot be undone.")
                     
-                    # [الحل البرمجي القاطع]: زر الحذف المباشر بدون دوال خلفية معقدة لضمان بقائه نشطاً وثابتاً 100%
+                    # تم إصلاح المسافة البادئة وضبط سطر الحذف ليعمل بشكل فوري ومستقر 100%
                     if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
+                        df_updated = df_all[df_all["ID"] != selected_id]
+                        df_updated.to_csv(DATA_FILE, index=False)
