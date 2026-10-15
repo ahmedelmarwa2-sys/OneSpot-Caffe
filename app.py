@@ -28,7 +28,8 @@ def check_password():
 # تشغيل البرنامج بالكامل إذا كانت كلمة المرور صحيحة
 if check_password():
     
-    col_logo, col_title = st.columns()
+    # تصحيح دالة الأعمدة بتمرير النِسب المطلوبة للشعار والعنوان لمنع الـ TypeError
+    col_logo, col_title = st.columns([1, 6])
     
     with col_logo:
         try:
@@ -145,12 +146,12 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # 🔥 الإصلاح القاطع: قمنا بإضافة [0] بعد iloc لضمان استرجاع سطر بيانات مفرد (سلسلة نصية/رقمية مباشرة)
+            # تم تعديلها إلى الصياغة الصحيحة بالكامل [0] لتفادي مشاكل الأزرار التفاعلية
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
             
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns([1, 1])
             
             with col1:
                 st.write("**Option A: Edit Selected Item**")
