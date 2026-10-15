@@ -34,7 +34,6 @@ if check_password():
     def load_data():
         if os.path.exists(DATA_FILE):
             df = pd.read_csv(DATA_FILE)
-            # التأكد من وجود الأعمدة بالترتيب الصحيح
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
             return df
@@ -115,8 +114,10 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            # اختيار رقم المعاملة المراد تعديلها أو حذفها
+            # اختيار رقم المعاملة
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
+            
+            # جلب السطر المحدد بدقة من الجدول
             row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
@@ -125,8 +126,10 @@ if check_password():
             
             with col1:
                 st.write("**Option A: Edit Selected Item**")
-                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key="edit_amt")
-                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key="edit_dsc")
+                # تم حل المشكلة هنا عبر تعيين مفتاح ديناميكي يتغير بتغير المعرف (selected_id)
+                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
+                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                
                 if st.button("✏️ Save Changes"):
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
