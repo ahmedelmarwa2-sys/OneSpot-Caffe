@@ -28,15 +28,13 @@ def check_password():
 # تشغيل البرنامج بالكامل إذا كانت كلمة المرور صحيحة
 if check_password():
     
-    # [تعديل الشعار المحلي المباشر والمضمون 100%]
-    col_logo, col_title = st.columns([1, 6]) # تخصيص مساحة متناسقة (جزء للشعار و6 أجزاء للعنوان)
+    col_logo, col_title = st.columns([1, 6])
     
     with col_logo:
-        # قراءة الصورة المحلية المرفوعة مباشرة من المستودع بجانب ملف الكود
         try:
             st.image("logo.png", width=90)
         except:
-            st.write("☕") # يظهر هذا الرمز التعبيري كبديل مؤقت في حال وجود خطأ في اسم الصورة
+            st.write("☕")
             
     with col_title:
         st.title("Onespot Cafe Financial Management System")
@@ -55,16 +53,20 @@ if check_password():
     df_all = load_data()
     st.markdown("---")
     
-    # القوائم المحددة الثابتة لبنود الحسابات
     INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
     EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
     
-    # 2. نموذج الإدخال الثابت والمحمي بالـ Session State لمنع اختفاء البيانات وتصفيرها بعد الحفظ
+    # دالة ذكية لتصفير الخانات تلقائياً عند الضغط على زر الحفظ بنجاح
+    def reset_form_fields():
+        st.session_state["type_radio"] = None
+        if "income_select" in st.session_state: del st.session_state["income_select"]
+        if "expense_select" in st.session_state: del st.session_state["expense_select"]
+        st.session_state["tx_amount_key"] = 0.0
+        st.session_state["tx_description_key"] = ""
+
+    # 2. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
-    if "form_type" not in st.session_state:
-        st.session_state["form_type"] = None
-
     tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
     tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
     
@@ -98,13 +100,8 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # 🔥 الحل النهائي: نستخدم أمر del لمسح المفاتيح نهائياً بدلاً من إسناد قيمة None مباشرة
-            if "type_radio" in st.session_state: del st.session_state["type_radio"]
-            if "income_select" in st.session_state: del st.session_state["income_select"]
-            if "expense_select" in st.session_state: del st.session_state["expense_select"]
-            if "tx_amount_key" in st.session_state: del st.session_state["tx_amount_key"]
-            if "tx_description_key" in st.session_state: del st.session_state["tx_description_key"]
-            
+            # تفعيل التصفير الفوري
+            reset_form_fields()
             st.success("✅ Successfully Recorded!")
             st.rerun()
             
@@ -144,9 +141,9 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
+            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_action")
             
-            # تم إصلاح الجلب ليعمل بدون مشاكل في الاستدعاء
+            # تم الإصلاح هنا بإضافة [0] لضمان جلب السطر ككائن صحيح ومنع أخطاء العناصر المتعددة
             row_data = df_all[df_all["ID"] == selected_id].iloc[0]
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
@@ -167,10 +164,9 @@ if check_password():
                 edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
                 edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
                 
-                if st.button("✏️ Save Changes"):
+                if st.button("✏️ Save Changes", key=f"save_edit_{selected_id}"):
                     df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == omnibus_id, "Description"] = edit_desc if 'omnibus_id' in locals() else edit_desc # حماية متغيرات
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success(f"Transaction ID {selected_id} updated successfully!")
@@ -180,7 +176,7 @@ if check_password():
                 st.write("**Option B: Delete Selected Item**")
                 st.warning("⚠️ Warning: This action cannot be undone.")
                 
-                if st.button("🗑️ Delete Transaction", type="destructive", key=f"del_{selected_id}"):
+                if st.button("🗑️ Delete Transaction", type="destructive", key=f"btn_del_{selected_id}"):
                     df_all = df_all[df_all["ID"] != selected_id]
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success(f"Transaction ID {selected_id} deleted successfully!")
