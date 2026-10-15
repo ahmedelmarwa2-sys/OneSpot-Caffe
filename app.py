@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-# وظيفة الحماية 
+# 1. وظيفة الحماية والتحقق من كلمة المرور
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["password"]:
@@ -28,9 +28,10 @@ def check_password():
 if not check_password():
     st.stop()
 
-# --- البرنامج الرئيسي ---
+# --- البرنامج الرئيسي بعد التحقق من الأمان ---
 
-col_logo, col_title = st.columns()
+# [تعديل هنا]: تمرير رقم 2 لإنشاء عمودين وتفادي الـ TypeError
+col_logo, col_title = st.columns(2)
 with col_logo:
     try:
         st.image("logo.png", width=90)
@@ -71,7 +72,7 @@ EXPENSE_CATS = [
     "Other Expense (مصروفات أخرى)"
 ]
 
-# تهيئة مخازن القيم الافتراضية لمنع الأخطاء التكرارية تزامناً مع الحفظ
+# تهيئة مخازن القيم الافتراضية للتصفير الآمن لحقول الإدخال
 if "amt_state_val" not in st.session_state:
     st.session_state["amt_state_val"] = 0.0
 if "desc_state_val" not in st.session_state:
@@ -81,7 +82,7 @@ st.subheader("📝 Record New Transaction")
 
 tx_date = st.date_input("Transaction Date:", datetime.date.today())
 
-# استخدام حيلة بسيطة لـ Radio: استخدام مفتاح ديناميكي يتغير عند الرغبة في التصفير الشامل
+# استخدام مفتاح ديناميكي لتصفير أزرار الـ Radio تلقائياً بعد الحفظ
 if "radio_reset_key" not in st.session_state:
     st.session_state["radio_reset_key"] = 0
 
@@ -101,7 +102,7 @@ else:
     st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
     tx_category = None
     
-# ربط القيمة بالحقول الرسومية عبر الـ state_val الداخلي 
+# ربط القيمة الحالية بـ الـ session state لضمان مسح النص والرقم بعد الحفظ
 tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", value=st.session_state["amt_state_val"])
 tx_description = st.text_input("Description / Notes (البيان):", value=st.session_state["desc_state_val"])
 
@@ -124,10 +125,10 @@ if st.button("💾 Save Transaction", type="primary"):
         df_all = pd.concat([df_all, new_row], ignore_index=True)
         df_all.to_csv(DATA_FILE, index=False)
         
-        # التصفير الآمن للقيم وتحديث واجهة المستخدم
+        # التصفير الآمن والمضمون للواجهة
         st.session_state["amt_state_val"] = 0.0
         st.session_state["desc_state_val"] = ""
-        st.session_state["radio_reset_key"] += 1 # تغيير المفتاح يجبر الـ Radio على العودة إلى الوضع None فوراً
+        st.session_state["radio_reset_key"] += 1 
         
         st.success("✅ Successfully Recorded!")
         st.rerun()
@@ -184,7 +185,9 @@ with tab3:
     st.subheader("🛠️ Modify or Remove a Transaction")
     if not df_all.empty:
         selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-        row_data = df_all[df_all["ID"] == selected_id].iloc[0] # تصحيح استدعاء السطر لإرجاع السجل الفعلي
+        
+        # [تعديل هـنا]: إصلاح جلب السطر الفعلي باستخدام iloc[0] لمنع أخطاء الـ AttributeError
+        row_data = df_all[df_all["ID"] == selected_id].iloc[0]
         
         st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
         
