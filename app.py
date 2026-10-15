@@ -43,16 +43,26 @@ if check_password():
     df_all = load_data()
     st.markdown("---")
     
+    # القوائم المحددة الثابتة للبند
+    INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
+    EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
+    
     # 2. نموذج الإدخال (Form) لإضافة عملية جديدة
     st.subheader("📝 Record New Transaction")
     with st.form(key="cafe_entry_form", clear_on_submit=True):
         tx_date = st.date_input("Transaction Date:", datetime.date.today())
-        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], horizontal=True)
         
+        # [تعديل] جعل الاختيار فارغاً في البداية (None) لكي تجبر المستخدم على الاختيار
+        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
+        
+        # إظهار البند بناءً على الاختيار
         if tx_type == "Income":
-            tx_category = st.selectbox("Category البند:", ["Daily Sales", "Event Catering", "Other Income"])
+            tx_category = st.selectbox("Category البند:", INCOME_CATS)
+        elif tx_type == "Expense":
+            tx_category = st.selectbox("Category البند:", EXPENSE_CATS)
         else:
-            tx_category = st.selectbox("Category البند:", ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"])
+            st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
+            tx_category = None
             
         tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
         tx_description = st.text_input("Description / Notes (البيان):")
@@ -60,7 +70,9 @@ if check_password():
         submit_button = st.form_submit_button(label="Save & Update")
     
     if submit_button:
-        if tx_amount == 0 or tx_description == "":
+        if tx_type is None:
+            st.error("⚠️ Please select Transaction Type (Income or Expense)!")
+        elif tx_amount == 0 or tx_description == "":
             st.error("⚠️ Please fill in all fields!")
         else:
             next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
@@ -114,7 +126,6 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            # اختيار رقم المعاملة
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
             
             # جلب السطر المحدد بدقة من الجدول
@@ -126,11 +137,23 @@ if check_password():
             
             with col1:
                 st.write("**Option A: Edit Selected Item**")
-                # تم حل المشكلة هنا عبر تعيين مفتاح ديناميكي يتغير بتغير المعرف (selected_id)
+                
+                # [تعديل] إضافة قائمة منسدلة للبند في شاشة التعديل وقراءة القيمة القديمة كافتراضية
+                current_type = row_data["Type"]
+                cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
+                
+                # حساب موقع القائمة القديمة لتظهر هي أول خيار تلقائياً
+                try:
+                    default_idx = cat_options.index(row_data["Category"])
+                except ValueError:
+                    default_idx = 0
+                    
+                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
                 edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
                 edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
                 
                 if st.button("✏️ Save Changes"):
+                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
                     df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
                     df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
                     df_all.to_csv(DATA_FILE, index=False)
