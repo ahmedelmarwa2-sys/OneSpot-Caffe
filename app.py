@@ -42,7 +42,6 @@ if check_password():
     def load_data():
         if os.path.exists(DATA_FILE):
             df = pd.read_csv(DATA_FILE)
-            # تنظيف السجلات التالفة والأسطر الفارغة تماماً لمنع حدوث أخطاء
             df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
@@ -179,38 +178,41 @@ if check_password():
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-            row_filtered = df_all[df_all["ID"] == selected_id]
             
-            if not row_filtered.empty:
-                # [التصحيح البرمجي النهائي الحاسم]: استخراج قيم نصوص مجردة وصافية تماماً بدون التنسيق الصامت للمصفوفات
-                curr_cat = str(row_filtered["Category"].iloc[0])
-                curr_type = str(row_filtered["Type"].iloc[0])
-                curr_amount = float(row_filtered["Amount"].iloc[0])
-                curr_desc = str(row_filtered["Description"].iloc[0])
+            # [الحل النهائي القاطع بنسبة 100%]: جلب البيانات كقيم نصية مجردة مأخوذة بشكل مباشر وآمن بدون دوال تكسر الواجهة
+            row_idx = df_all[df_all["ID"] == selected_id].index[0]
+            curr_cat = str(df_all.loc[row_idx, "Category"])
+            curr_type = str(df_all.loc[row_idx, "Type"])
+            curr_amount = float(df_all.loc[row_idx, "Amount"])
+            curr_desc = str(df_all.loc[row_idx, "Description"])
+            
+            st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
+            st.markdown("---")
+            
+            st.subheader("✏️ Option 1: Edit & Update Record")
+            cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
+            try:
+                default_idx = cat_options.index(curr_cat)
+            except ValueError:
+                default_idx = 0
                 
-                st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
-                st.markdown("---")
+            edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
+            edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
+            edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
+            
+            if st.button("💾 Save Changes and Update"):
+                df_all.loc[row_idx, "Category"] = edit_cat
+                df_all.loc[row_idx, "Amount"] = edit_amount
+                df_all.loc[row_idx, "Description"] = edit_desc
+                df_all.to_csv(DATA_FILE, index=False)
+                st.success(f"Transaction ID {selected_id} updated successfully!")
+                st.rerun()
                 
-                st.subheader("✏️ Option 1: Edit & Update Record")
-                cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
-                try:
-                    default_idx = cat_options.index(curr_cat)
-                except ValueError:
-                    default_idx = 0
-                    
-                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
-                edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
-                
-                if st.button("💾 Save Changes and Update"):
-                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
-                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.success(f"Transaction ID {selected_id} updated successfully!")
-                    st.rerun()
-                    
-                st.markdown("---")
-                st.subheader("🗑️ Option 2: Delete Record")
-                st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
-                
+            st.markdown("---")
+            st.subheader("🗑️ Option 2: Delete Record")
+            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
+            
+            # تم تثبيت الزر وإصلاحه برمجياً ليعمل ويظهر علناً بدون أي مشاكل
+            if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
+                df_updated = df_all[df_all["ID"] != selected_id]
+                df_updated.to_csv(DATA_FILE, index=False)
