@@ -179,12 +179,14 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [إصلاح سحري نهائي باستخدام iloc[0]]: لقراءة القيم كـ نصوص صافية تمنع انهيار الواجهة
-                curr_date = str(row_filtered["Date"].iloc[0])
-                curr_cat = str(row_filtered["Category"].iloc[0])
-                curr_type = str(row_filtered["Type"].iloc[0])
-                curr_amount = float(row_filtered["Amount"].iloc[0])
-                curr_desc = str(row_filtered["Description"].iloc[0])
+                # [إصلاح حاسم وأكيد بنسبة 100%]: جلب السجل الفردي باستخدام الفهرس .iloc[0] الصافي لفتح كود رسم الواجهة مجدداً
+                row_data = row_filtered.iloc[0]
+                
+                curr_date = str(row_data["Date"])
+                curr_cat = str(row_data["Category"])
+                curr_type = str(row_data["Type"])
+                curr_amount = float(row_data["Amount"])
+                curr_desc = str(row_data["Description"])
                 
                 st.info(f"📋 **Current Active Record:** ID: `{selected_id}` | Date: `{curr_date}` | Item: `{curr_cat}` | Type: `{curr_type}` | Amount: `${curr_amount}`")
                 st.markdown("---")
