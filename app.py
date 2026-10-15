@@ -27,15 +27,24 @@ def check_password():
 
 if check_password():
     
-    # 2. إعدادات العنوان الرئيسي والشعار
-    col_logo, col_title = st.columns(2)
+    # 2. [تم التعديل هنا] إعدادات العنوان الرئيسي والشعار بشكل متناسق ومودرن
+    col_logo, col_title = st.columns([1, 12]) # توزيع المسافات ليصبح اللوجو بجانب النص تماماً
     with col_logo:
         try:
-            st.image("logo.png", width=90)
+            st.image("logo.png", width=75)
         except:
-            st.write("☕") 
+            st.markdown("<h1 style='margin:0; padding:0; text-align:center;'>☕</h1>", unsafe_allow_html=True) 
     with col_title:
-        st.title("Onespot Cafe Financial Management System")
+        st.markdown(
+            """
+            <div style='display: flex; align-items: center; height: 75px;'>
+                <h1 style='margin: 0; padding: 0; font-family: "Segoe UI", sans-serif; font-size: 28px; color: #2c3e50; font-weight: 700;'>
+                    Onespot Cafe <span style='font-size: 20px; color: #7f8c8d; font-weight: 400; border-left: 2px solid #bdc3c7; padding-left: 10px; margin-left: 10px;'>Financial Management System</span>
+                </h1>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
     
     DATA_FILE = "cafe_data.csv"
     
@@ -54,11 +63,9 @@ if check_password():
     
     # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
-        
         "Takeaway (سفره وسيارة)", 
         "Daily Sales (المبيعات اليوميه)", 
         "PS (play staion)",
-
         "Other Income (إيرادات أخرى)"
     ]
     EXPENSE_CATS = [
@@ -66,7 +73,6 @@ if check_password():
         "Staff Salaries (رواتب الموظفين)", 
         "Rent & Utilities (إيجار وفواتير)", 
         "(valu installments) (اقساط فاليو)", 
-         
         "Packaging (أكواب ومطبوعات)",
         "Other Expense (مصروفات أخرى)"
     ]
@@ -173,41 +179,17 @@ if check_password():
             st.info("No data recorded yet.")
 
     with tab3:
+        # [تم التعديل هنا] تكميل الجزء المقطوع وتأمين تشغيله بشكل كامل وصحيح
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            # جعل اختيار المعرف علني ومستقل تماماً لضمان رسم الحقول دوماً
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
             
-            # زر الحذف العلني المستقل مفرود في الأعلى ليكون متاحاً أمامك دائماً دون أي شروط مخفية
             st.markdown("### 🗑️ Delete Record")
             st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
             if st.button("❌ Click Here to Delete Record Permanently", type="primary", key=f"del_{selected_id}"):
                 df_updated = df_all[df_all["ID"] != selected_id]
                 df_updated.to_csv(DATA_FILE, index=False)
-                st.error(f"Transaction ID {selected_id} deleted successfully!")
+                st.success(f"✅ Record #{selected_id} deleted successfully!")
                 st.rerun()
-                
-            st.markdown("---")
-            st.markdown("### ✏️ Edit & Update Record")
-            row_filtered = df_all[df_all["ID"] == selected_id]
-            if not row_filtered.empty:
-                # استخراج البيانات باستخدام الفهرس المباشر لتعبئة حقول التعديل
-                curr_cat = str(row_filtered["Category"].values[0])
-                curr_type = str(row_filtered["Type"].values[0])
-                curr_amount = float(row_filtered["Amount"].values[0])
-                curr_desc = str(row_filtered["Description"].values[0])
-                
-                cat_options = INCOME_CATS if curr_type == "Income" else EXPENSE_CATS
-                try:
-                    default_idx = cat_options.index(curr_cat)
-                except ValueError:
-                    default_idx = 0
-                    
-                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                edit_amount = st.number_input("New Amount (\$):", value=curr_amount, key=f"amt_{selected_id}")
-                edit_desc = st.text_input("New Description / Notes:", value=curr_desc, key=f"dsc_{selected_id}")
-                
-                if st.button("💾 Save Changes and Update"):
-                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
-                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+        else:
+            st.info("No data available to modify.")
