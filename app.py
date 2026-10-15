@@ -1,4 +1,33 @@
-    # 2. إعدادات العنوان الرئيسي والشعار
+import streamlit as st
+import pandas as pd
+import datetime
+import os
+
+# 1. إعدادات الحماية والأمان بالباسورد
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
+        st.title("🔒 Cafe System - Secure Login")
+        st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("🔒 Cafe System - Secure Login")
+        st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
+        st.error("❌ Incorrect password. Please try again.")
+        return False
+    else:
+        return True
+
+if check_password():
+    
+    # 2. إعدادات العنوان الرئيسي والشعار (تم ضبط المسافات هنا بدقة تامة لتفادي الخطأ)
     col_logo, col_title = st.columns([1, 8])
     
     with col_logo:
@@ -46,3 +75,5 @@
             """, 
             unsafe_allow_html=True
         )
+    
+    DATA_FILE = "cafe_data.csv"
