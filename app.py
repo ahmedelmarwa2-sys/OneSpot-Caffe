@@ -128,7 +128,6 @@ if check_password():
             df_inc = df_all[df_all['Type'] == 'Income']
             df_expenses = df_all[df_all['Type'] == 'Expense']
             
-            # إعداد بيانات التحليل للتاريخ لدمجها لاحقاً في التقرير
             inc_data = pd.DataFrame()
             exp_data = pd.DataFrame()
             
@@ -147,11 +146,10 @@ if check_password():
                 else:
                     st.write("No expenses recorded.")
             
-            # [بناء التقرير المدمج الجديد للطباعة الفورية]
+            # بناء التقرير المدمج الجديد للطباعة الفورية
             st.markdown("<br><hr>", unsafe_allow_html=True)
             st.subheader("📥 تصدير التقرير والتحليل للطباعة")
             
-            # دمج الجداول والملخصات مع فواصل منسقة في نص واحد متوافق مع إكسيل
             output = io.StringIO()
             output.write("--- ONE SPOT CAFE - MONTHLY PERFORMANCE REPORT ---\n\n")
             output.write(f"Report Date: {datetime.date.today()}\n")
@@ -174,7 +172,7 @@ if check_password():
                 
             combined_csv = output.getvalue().encode('utf-8-sig')
             
-            # زر التحميل الموحد الكبير والمميز لطباعة التقرير الشامل
+            # زر التحميل الموحد الكبير والمميز لطباعة التقرير الشامل (تم إغلاق الأقواس بالكامل)
             st.download_button(
                 label="🖨️ تحميل تقرير الأداء المجمع + تحليل البنود بالتاريخ (Excel جاهز للطباعة)",
                 data=combined_csv,
@@ -182,3 +180,9 @@ if check_password():
                 mime="text/csv",
                 type="primary",
                 use_container_width=True
+            )
+            
+        else:
+            st.info("No data recorded yet.")
+                
+    with tab2:
