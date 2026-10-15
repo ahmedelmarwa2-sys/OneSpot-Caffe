@@ -1,10 +1,70 @@
-    # 2. نموذج الإدخال الثابت والمحمي بالـ Session State لمنع اختفاء البيانات
+import streamlit as st
+import pandas as pd
+import datetime
+import os
+
+# 1. إعدادات الحماية والأمان بالباسورد (تتحقق من السيرفر السحابي)
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
+        st.title("🔒 Cafe System - Secure Login")
+        st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("🔒 Cafe System - Secure Login")
+        st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
+        st.error("❌ Incorrect password. Please try again.")
+        return False
+    else:
+        return True
+
+# تشغيل البرنامج بالكامل إذا كانت كلمة المرور صحيحة
+if check_password():
+    
+    # [تعديل الشعار المحلي المباشر والمضمون 100%]
+    col_logo, col_title = st.columns([1, 6]) # تخصيص مساحة متناسقة (جزء للشعار و6 أجزاء للعنوان)
+    
+    with col_logo:
+        # قراءة الصورة المحلية المرفوعة مباشرة من المستودع بجانب ملف الكود
+        try:
+            st.image("logo.png", width=90)
+        except:
+            st.write("☕") # يظهر هذا الرمز التعبيري كبديل مؤقت في حال وجود خطأ في اسم الصورة
+            
+    with col_title:
+        st.title("Onespot Cafe Financial Management System")
+    
+    DATA_FILE = "cafe_data.csv"
+    
+    def load_data():
+        if os.path.exists(DATA_FILE):
+            df = pd.read_csv(DATA_FILE)
+            if "ID" not in df.columns:
+                df.insert(0, "ID", range(1, len(df) + 1))
+            return df
+        else:
+            return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
+    
+    df_all = load_data()
+    st.markdown("---")
+    
+    # القوائم المحددة الثابتة لبنود الحسابات
+    INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
+    EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
+    
+    # 2. نموذج الإدخال الثابت والمحمي بالـ Session State لمنع اختفاء البيانات وتصفيرها بعد الحفظ
     st.subheader("📝 Record New Transaction")
     
     if "form_type" not in st.session_state:
         st.session_state["form_type"] = None
 
-    # إضافة ميزة تفريغ الخانات عبر التحكم بالـ keys وإدخال قيم افتراضية مرنة
     tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
     tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
     
@@ -38,7 +98,7 @@
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # 🔥 الحل السحري: نقوم بمسح قيم الخانات من الذاكرة لتظهر فارغة بعد التحديث
+            # مسح قيم الخانات من الذاكرة لتظهر فارغة بعد التحديث
             if "type_radio" in st.session_state: st.session_state["type_radio"] = None
             if "income_select" in st.session_state: del st.session_state["income_select"]
             if "expense_select" in st.session_state: del st.session_state["expense_select"]
@@ -47,3 +107,81 @@
             
             st.success("✅ Successfully Recorded!")
             st.rerun()
+            
+    st.markdown("---")
+    
+    # 3. عرض التقارير والجداول المحدثة والتفاعلية
+    tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
+    
+    with tab1:
+        st.subheader("Monthly Performance (Profit & Loss)")
+        if not df_all.empty:
+            df_all['Amount'] = pd.to_numeric(df_all['Amount'])
+            df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
+            
+            monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
+                'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
+                'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
+                'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()
+            }), include_groups=False).reset_index()
+            
+            months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+            monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
+            st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
+            
+            st.subheader("🔍 Expense Breakdown (تحليل بند المصروفات)")
+            df_expenses = df_all[df_all['Type'] == 'Expense']
+            if not df_expenses.empty:
+                expense_breakdown = df_expenses.groupby('Category')['Amount'].sum().reset_index()
+                st.dataframe(expense_breakdown.rename(columns={'Category': 'Expense Item', 'Amount': 'Total Spent (\$)'}), use_container_width=True, hide_index=True)
+        else:
+            st.info("No data recorded yet.")
+            
+    with tab2:
+        st.subheader("All Records Saved")
+        st.dataframe(df_all, use_container_width=True, hide_index=True)
+
+    with tab3:
+        st.subheader("🛠️ Modify or Remove a Transaction")
+        if not df_all.empty:
+            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
+            
+            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+            
+            st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Option A: Edit Selected Item**")
+                current_type = row_data["Type"]
+                cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
+                
+                try:
+                    default_idx = cat_options.index(row_data["Category"])
+                except ValueError:
+                    default_idx = 0
+                    
+                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
+                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
+                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                
+                if st.button("✏️ Save Changes"):
+                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
+                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
+                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.success(f"Transaction ID {selected_id} updated successfully!")
+                    st.rerun()
+                    
+            with col2:
+                st.write("**Option B: Delete Selected Item**")
+                st.warning("⚠️ Warning: This action cannot be undone.")
+                
+                if st.button("🗑️ Delete Transaction", type="destructive", key=f"del_{selected_id}"):
+                    df_all = df_all[df_all["ID"] != selected_id]
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.success(f"Transaction ID {selected_id} deleted successfully!")
+                    st.rerun()
+        else:
+            st.info("No data available to modify or delete.")
