@@ -126,42 +126,47 @@ if check_password():
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
             
-            # [التصحيح السحري هنا] أضفنا .iloc[0] لضمان جلب السطر كبيانات مفردة بدون أخطاء تجميعية
-            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+            # التعديل الآمن: تصفية البيانات والتحقق من وجود السطر قبل جلب البيانات لمنع IndexError
+            filtered_df = df_all[df_all["ID"] == selected_id]
             
-            st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("**Option A: Edit Selected Item**")
-                current_type = row_data["Type"]
-                cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
+            if not filtered_df.empty:
+                row_data = filtered_df.iloc[0]
                 
-                try:
-                    default_idx = cat_options.index(row_data["Category"])
-                except ValueError:
-                    default_idx = 0
-                    
-                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
-                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
-                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
                 
-                if st.button("✏️ Save Changes"):
-                    df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
-                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.success(f"Transaction ID {selected_id} updated successfully!")
-                    st.rerun()
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Option A: Edit Selected Item**")
+                    current_type = row_data["Type"]
+                    cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
                     
-            with col2:
-                st.write("**Option B: Delete Selected Item**")
-                st.write("Warning: This action cannot be undone.")
-                if st.button("🗑️ Permanently Delete", type="primary"):
-                    df_all = df_all[df_all["ID"] != selected_id]
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.warning(f"Transaction ID {selected_id} has been deleted!")
-                    st.rerun()
+                    try:
+                        default_idx = cat_options.index(row_data["Category"])
+                    except ValueError:
+                        default_idx = 0
+                        
+                    edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_{selected_id}")
+                    edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_{selected_id}")
+                    edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_{selected_id}")
+                    
+                    if st.button("✏️ Save Changes"):
+                        df_all.loc[df_all["ID"] == selected_id, "Category"] = edit_cat
+                        df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
+                        df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+                        df_all.to_csv(DATA_FILE, index=False)
+                        st.success(f"Transaction ID {selected_id} updated successfully!")
+                        st.rerun()
+                        
+                with col2:
+                    st.write("**Option B: Delete Selected Item**")
+                    st.write("Warning: This action cannot be undone.")
+                    if st.button("🗑️ Permanently Delete", type="primary"):
+                        df_all = df_all[df_all["ID"] != selected_id]
+                        df_all.to_csv(DATA_FILE, index=False)
+                        st.warning(f"Transaction ID {selected_id} has been deleted!")
+                        st.rerun()
+            else:
+                st.warning("⚠️ The selected ID was not found or has been removed.")
         else:
             st.info("No data available to edit or delete.")
