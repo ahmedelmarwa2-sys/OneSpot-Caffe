@@ -182,7 +182,7 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [تعديل جذري وأمان محاسبي الحل النهائي]: استخراج قيم مفردة صافية تماماً [0] لمنع تدمير رسم بقية الأزرار
+                # [إصلاح برمي نهائي وجذري]: استخراج قيم نصوص وأرقام صافية تماماً بدون أشكال المصفوفات والأقواس
                 curr_cat = str(row_filtered["Category"].values[0])
                 curr_type = str(row_filtered["Type"].values[0])
                 curr_amount = float(row_filtered["Amount"].values[0])
