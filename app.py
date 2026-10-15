@@ -13,7 +13,7 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        st.set_page_config(page_title="Login Required", page_icon="🔒")
+        st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
         st.title("🔒 Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
@@ -33,27 +33,29 @@ if check_password():
     
     def load_data():
         if os.path.exists(DATA_FILE):
-            return pd.read_csv(DATA_FILE)
+            df = pd.read_csv(DATA_FILE)
+            # التأكد من وجود الأعمدة بالترتيب الصحيح
+            if "ID" not in df.columns:
+                df.insert(0, "ID", range(1, len(df) + 1))
+            return df
         else:
-            # أضفنا عمود جديد باسم Sub_Category للقائمة المنسدلة
-            return pd.DataFrame(columns=["Date", "Month_No", "Category", "Type", "Amount", "Description"])
+            return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
     
     df_all = load_data()
     st.markdown("---")
     
-    # 2. تصميم نموذج الإدخال (Form) المطور بالقوائم المنسدلة
+    # 2. نموذج الإدخال (Form) لإضافة عملية جديدة
     st.subheader("📝 Record New Transaction")
     with st.form(key="cafe_entry_form", clear_on_submit=True):
         tx_date = st.date_input("Transaction Date:", datetime.date.today())
         tx_type = st.radio("Transaction Type:", ["Income", "Expense"], horizontal=True)
         
-        # القائمة المنسدلة الذكية: تتغير محتوياتها تلقائياً بناءً على اختيارك (إيرادات أم مصروفات)
         if tx_type == "Income":
             tx_category = st.selectbox("Category البند:", ["Daily Sales", "Event Catering", "Other Income"])
         else:
             tx_category = st.selectbox("Category البند:", ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"])
             
-        tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f")
+        tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
         tx_description = st.text_input("Description / Notes (البيان):")
         
         submit_button = st.form_submit_button(label="Save & Update")
@@ -62,8 +64,9 @@ if check_password():
         if tx_amount == 0 or tx_description == "":
             st.error("⚠️ Please fill in all fields!")
         else:
-            # ترحيل البيانات بالبند الجديد
+            next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
             new_row = pd.DataFrame([{
+                "ID": next_id,
                 "Date": str(tx_date), 
                 "Month_No": tx_date.month, 
                 "Category": tx_category, 
@@ -74,12 +77,12 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             st.success("✅ Successfully Recorded!")
-            st.balloons()
+            st.rerun()
             
     st.markdown("---")
     
     # 3. عرض التقارير والجداول المحدثة
-    tab1, tab2 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log"])
+    tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
         st.subheader("Monthly Performance (Profit & Loss)")
@@ -91,21 +94,53 @@ if check_password():
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
                 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
                 'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()
-            })).reset_index()
+            }), include_groups=False).reset_index()
             
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            # ميزة جديدة: جدول تحليل المصروفات حسب كل بند
             st.subheader("🔍 Expense Breakdown (تحليل بند المصروفات)")
             df_expenses = df_all[df_all['Type'] == 'Expense']
             if not df_expenses.empty:
                 expense_breakdown = df_expenses.groupby('Category')['Amount'].sum().reset_index()
-                st.dataframe(expense_breakdown.rename(columns={'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                st.dataframe(expense_breakdown.rename(columns={'Category': 'Expense Item', 'Amount': 'Total Spent (\$)'}), use_container_width=True, hide_index=True)
         else:
             st.info("No data recorded yet.")
             
     with tab2:
         st.subheader("All Records Saved")
         st.dataframe(df_all, use_container_width=True, hide_index=True)
+
+    with tab3:
+        st.subheader("🛠️ Modify or Remove a Transaction")
+        if not df_all.empty:
+            # اختيار رقم المعاملة المراد تعديلها أو حذفها
+            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
+            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+            
+            st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Option A: Edit Selected Item**")
+                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key="edit_amt")
+                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key="edit_dsc")
+                if st.button("✏️ Save Changes"):
+                    df_all.loc[df_all["ID"] == selected_id, "Amount"] = edit_amount
+                    df_all.loc[df_all["ID"] == selected_id, "Description"] = edit_desc
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.success(f"Transaction ID {selected_id} updated successfully!")
+                    st.rerun()
+                    
+            with col2:
+                st.write("**Option B: Delete Selected Item**")
+                st.write("Warning: This action cannot be undone.")
+                if st.button("🗑️ Permanently Delete", type="primary"):
+                    df_all = df_all[df_all["ID"] != selected_id]
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.warning(f"Transaction ID {selected_id} has been deleted!")
+                    st.rerun()
+        else:
+            st.info("No data available to edit or delete.")
