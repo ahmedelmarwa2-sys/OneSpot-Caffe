@@ -72,48 +72,62 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # 3. نموذج الإدخال (Form المصفّر الذاتي المستوحى من الأكواد السابقة)
+    # 3. نموذج الإدخال الذكي مع تصفية البنود تلقائياً بناءً على نوع المعاملة
     st.subheader("📝 Record New Transaction")
     
-    with st.form(key="cafe_entry_form", clear_on_submit=True):
-        tx_date = st.date_input("Transaction Date:", datetime.date.today())
-        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
+    # حيلة مفتاح التصفير الديناميكي للراديو
+    if "radio_reset_key" not in st.session_state:
+        st.session_state["radio_reset_key"] = 0
         
-        # دمج القوائم لتعمل بشكل مستقر داخل الـ Form لمنع تعليق المدخلات
-        tx_category = st.selectbox("Category البند:", INCOME_CATS + EXPENSE_CATS)
-        
-        tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
-        tx_description = st.text_input("Description / Notes (البيان):")
-        
-        submit_button = st.form_submit_button(label="💾 Save Transaction", type="primary")
+    tx_type = st.radio(
+        "Transaction Type:", 
+        ["Income", "Expense"], 
+        index=None, 
+        horizontal=True,
+        key=f"type_radio_{st.session_state['radio_reset_key']}"
+    )
     
-    if submit_button:
-        if tx_type is None:
-            st.error("⚠️ Please select Transaction Type (Income or Expense)!")
-        elif tx_amount == 0 or tx_description == "":
-            st.error("⚠️ Please fill in all fields!")
-        # التحقق من صحة اختيار البند مع نوع المعاملة محاسبياً قبل الحفظ
-        elif tx_type == "Income" and tx_category in EXPENSE_CATS:
-            st.error("⚠️ Please select an Income Category for an Income Transaction!")
-        elif tx_type == "Expense" and tx_category in INCOME_CATS:
-            st.error("⚠️ Please select an Expense Category for an Expense Transaction!")
-        else:
-            next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-            new_row = pd.DataFrame([{
-                "ID": next_id,
-                "Date": str(tx_date), 
-                "Month_No": tx_date.month, 
-                "Category": tx_category, 
-                "Type": tx_type, 
-                "Amount": tx_amount, 
-                "Description": tx_description
-            }])
-            df_all = pd.concat([df_all, new_row], ignore_index=True)
-            df_all.to_csv(DATA_FILE, index=False)
+    # تصفية وتحديد القائمة المعروضة فوراً بناءً على ضغطة المستخدم
+    if tx_type == "Income":
+        current_cats = INCOME_CATS
+    elif tx_type == "Expense":
+        current_cats = EXPENSE_CATS
+    else:
+        current_cats = []
+        st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
+        
+    # عرض الحقول بداخل الـ Form لضمان مسح البيانات بعد الضغط على زر الحفظ
+    if tx_type is not None:
+        with st.form(key="cafe_entry_form", clear_on_submit=True):
+            tx_date = st.date_input("Transaction Date:", datetime.date.today())
+            tx_category = st.selectbox("Category البند:", current_cats)
+            tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
+            tx_description = st.text_input("Description / Notes (البيان):")
             
-            st.success("✅ Successfully Recorded!")
-            st.rerun()  # تحديث الشاشة فوراً لقراءة البيانات الجديدة وعرضها بالأسفل
-            
+            submit_button = st.form_submit_button(label="💾 Save Transaction", type="primary")
+        
+        if submit_button:
+            if tx_amount == 0 or tx_description == "":
+                st.error("⚠️ Please fill in all fields!")
+            else:
+                next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
+                new_row = pd.DataFrame([{
+                    "ID": next_id,
+                    "Date": str(tx_date), 
+                    "Month_No": tx_date.month, 
+                    "Category": tx_category, 
+                    "Type": tx_type, 
+                    "Amount": tx_amount, 
+                    "Description": tx_description
+                }])
+                df_all = pd.concat([df_all, new_row], ignore_index=True)
+                df_all.to_csv(DATA_FILE, index=False)
+                
+                # تصفير زر الراديو تلقائياً ليعود فارغاً للعملية التالية
+                st.session_state["radio_reset_key"] += 1
+                st.success("✅ Successfully Recorded!")
+                st.rerun()  
+                
     st.markdown("---")
     
     # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة الثلاثة)
@@ -168,7 +182,6 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
-                # [تعديل جوهري للحل النهائي للخطأ]: إضافة [0] بعد iloc لجلب السلسلة بشكل سليم تماماً
                 row_data = row_filtered.iloc[0]
                 st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
                 
@@ -198,5 +211,3 @@ if check_password():
                     st.write("**Option B: Delete Selected Item**")
                     st.write("Warning: This action cannot be undone.")
                     if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
-                        df_all = df_all[df_all["ID"] != selected_id]
-                        df_all.to_csv(DATA_FILE, index=False)
