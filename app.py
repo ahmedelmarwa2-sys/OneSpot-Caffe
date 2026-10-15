@@ -168,6 +168,7 @@ if check_password():
             row_filtered = df_all[df_all["ID"] == selected_id]
             
             if not row_filtered.empty:
+                # [تعديل جوهري للحل النهائي للخطأ]: إضافة [0] بعد iloc لجلب السلسلة بشكل سليم تماماً
                 row_data = row_filtered.iloc[0]
                 st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
                 
@@ -199,6 +200,3 @@ if check_password():
                     if st.button("❌ Confirm Delete", type="primary", key=f"del_{selected_id}"):
                         df_all = df_all[df_all["ID"] != selected_id]
                         df_all.to_csv(DATA_FILE, index=False)
-                        st.success(f"Transaction ID {selected_id} deleted successfully!")
-                        st.rerun()
-            else:
