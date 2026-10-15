@@ -47,29 +47,27 @@ if check_password():
     INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
     EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
     
-    # 2. نموذج الإدخال (Form) لإضافة عملية جديدة
+    # 2. نموذج الإدخال الذكي المحدث (تم إخراجه من الـ Form لتفعيل التفاعل اللحظي)
     st.subheader("📝 Record New Transaction")
-    with st.form(key="cafe_entry_form", clear_on_submit=True):
-        tx_date = st.date_input("Transaction Date:", datetime.date.today())
-        
-        # [تعديل] جعل الاختيار فارغاً في البداية (None) لكي تجبر المستخدم على الاختيار
-        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
-        
-        # إظهار البند بناءً على الاختيار
-        if tx_type == "Income":
-            tx_category = st.selectbox("Category البند:", INCOME_CATS)
-        elif tx_type == "Expense":
-            tx_category = st.selectbox("Category البند:", EXPENSE_CATS)
-        else:
-            st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
-            tx_category = None
-            
-        tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
-        tx_description = st.text_input("Description / Notes (البيان):")
-        
-        submit_button = st.form_submit_button(label="Save & Update")
     
-    if submit_button:
+    # الخانات أصبحت حرة وتتفاعل فوراً مع الضغط
+    tx_date = st.date_input("Transaction Date:", datetime.date.today())
+    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
+    
+    # إظهار البند المنسدل فوراً بناءً على ضغطتك بدون أي تأخير
+    if tx_type == "Income":
+        tx_category = st.selectbox("Category البند:", INCOME_CATS)
+    elif tx_type == "Expense":
+        tx_category = st.selectbox("Category البند:", EXPENSE_CATS)
+    else:
+        st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
+        tx_category = None
+        
+    tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f")
+    tx_description = st.text_input("Description / Notes (البيان):")
+    
+    # زر حفظ مستقل لمعالجة البيانات
+    if st.button("💾 Save Transaction", type="primary"):
         if tx_type is None:
             st.error("⚠️ Please select Transaction Type (Income or Expense)!")
         elif tx_amount == 0 or tx_description == "":
@@ -127,9 +125,7 @@ if check_password():
         st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
             selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist())
-            
-            # جلب السطر المحدد بدقة من الجدول
-            row_data = df_all[df_all["ID"] == selected_id].iloc[0]
+            row_data = df_all[df_all["ID"] == selected_id].iloc
             
             st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
             
@@ -137,12 +133,9 @@ if check_password():
             
             with col1:
                 st.write("**Option A: Edit Selected Item**")
-                
-                # [تعديل] إضافة قائمة منسدلة للبند في شاشة التعديل وقراءة القيمة القديمة كافتراضية
                 current_type = row_data["Type"]
                 cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
                 
-                # حساب موقع القائمة القديمة لتظهر هي أول خيار تلقائياً
                 try:
                     default_idx = cat_options.index(row_data["Category"])
                 except ValueError:
