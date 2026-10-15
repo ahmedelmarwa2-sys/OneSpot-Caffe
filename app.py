@@ -71,9 +71,9 @@ if check_password():
     
     # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
-        "Takeaway (سفره وسيارة)", 
+       
         "Daily Sales (المبيعات اليوميه)", 
-        "PS (play staion)",
+        
         "Other Income (إيرادات أخرى)"
     ]
     EXPENSE_CATS = [
