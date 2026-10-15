@@ -54,19 +54,19 @@ if check_password():
     
     # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
-        "Dine-in Sales (مبيعات الصالة)", 
-        "Takeaway/Drive-thru (سفري وسيارة)", 
-        "Delivery Sales (مبيعات التوصيل)", 
-        "Retail Sales (بن وأدوات تجزئة)",
-        "Event Catering (ضيافة وفعاليات)", 
+        
+        "Takeaway (سفره وسيارة)", 
+        "Daily Sales (المبيعات اليوميه)", 
+        "PS (play staion)",
+
         "Other Income (إيرادات أخرى)"
     ]
     EXPENSE_CATS = [
         "Coffee Beans & Milk (مواد خام)", 
         "Staff Salaries (رواتب الموظفين)", 
         "Rent & Utilities (إيجار وفواتير)", 
-        "Maintenance (صيانة آلات)", 
-        "Marketing (تسويق وإعلانات)", 
+        "(valu installments) (اقساط فاليو)", 
+         
         "Packaging (أكواب ومطبوعات)",
         "Other Expense (مصروفات أخرى)"
     ]
