@@ -62,6 +62,8 @@ if check_password():
             df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
+            # التأكد من أن الـ ID يتم قراءته كأرقام صحيحة
+            df["ID"] = df["ID"].astype(int)
             return df
         else:
             return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
@@ -71,9 +73,7 @@ if check_password():
     
     # القوائم الثابتة لبنود الحسابات المدمجة
     INCOME_CATS = [
-       
         "Daily Sales (المبيعات اليوميه)", 
-        
         "Other Income (إيرادات أخرى)"
     ]
     EXPENSE_CATS = [
@@ -189,33 +189,35 @@ if check_password():
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
                 df_inc = df_all[df_all['Type'] == 'Income']
-                if not df_inc.empty:
-                    inc_breakdown = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(inc_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No income recorded.")
+                st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
-                df_expenses = df_all[df_all['Type'] == 'Expense']
-                if not df_expenses.empty:
-                    expense_breakdown = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(expense_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
-                else:
-                    st.write("No expenses recorded.")
+                df_exp = df_all[df_all['Type'] == 'Expense']
+                st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
-            st.info("No data recorded yet.")
-            
+            st.info("💡 No data available to display in dashboard.")
+
     with tab2:
-        st.subheader("All Records Saved")
+        st.subheader("📅 All Historical Transactions Log")
         if not df_all.empty:
-            st.dataframe(df_all, use_container_width=True, hide_index=True)
+            st.dataframe(df_all[["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
         else:
-            st.info("No data recorded yet.")
+            st.info("💡 No recorded transactions found.")
 
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
+        
         if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
+            # ترتيب الأرقام تصاعدياً لسهولة الاختيار
+            available_ids = sorted(df_all["ID"].unique())
             
-            st.markdown("### 🗑️ Delete Record")
-            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
+            selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
+            
+            if selected_id:
+                # تصفية وجلب السطر المختار بناء على الـ ID
+                row_to_show = df_all[df_all["ID"] == selected_id]
+                
+                st.write("📋 **Selected Transaction Details (تفاصيل الفاتورة المختارة):**")
+                st.dataframe(row_to_show[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
