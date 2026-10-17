@@ -29,7 +29,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns()
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
         try:
