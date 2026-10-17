@@ -85,32 +85,31 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # دالة ذكية لتصفير الخانات تلقائياً عند الضغط على زر الحفظ بنجاح
-    def reset_form_fields():
-        st.session_state["type_radio"] = None
-        if "income_select" in st.session_state: del st.session_state["income_select"]
-        if "expense_select" in st.session_state: del st.session_state["expense_select"]
-        st.session_state["tx_amount_key"] = 0.0
-        st.session_state["tx_description_key"] = ""
+    # [مفتاح التصفير الذكي والآمن والمضمون 100%] لمنع الـ WidgetAlreadyInstantiatedError
+    if "form_reset_counter" not in st.session_state:
+        st.session_state["form_reset_counter"] = 0
 
     # 3. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
-    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
-    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
+    # ربط كافة عناصر النموذج الحالي بالمفتاح الديناميكي لضمان تنظيف البيانات دفعة واحدة بعد الحفظ
+    reset_suffix = st.session_state["form_reset_counter"]
+    
+    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"tx_date_key_{reset_suffix}")
+    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{reset_suffix}")
     
     if tx_type == "Income":
-        tx_category = st.selectbox("Category البند:", INCOME_CATS, key="income_select")
+        tx_category = st.selectbox("Category البند:", INCOME_CATS, key=f"income_select_{reset_suffix}")
     elif tx_type == "Expense":
-        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key="expense_select")
+        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key=f"expense_select_{reset_suffix}")
     else:
         st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
         tx_category = None
         
-    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key="tx_amount_key")
-    tx_description = st.text_input("Description / Notes (البيان):", key="tx_description_key")
+    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key=f"tx_amount_key_{reset_suffix}")
+    tx_description = st.text_input("Description / Notes (البيان):", key=f"tx_description_key_{reset_suffix}")
     
-    if st.button("💾 Save Transaction", type="primary"):
+    if st.button("💾 Save Transaction", type="primary", key=f"save_main_btn_{reset_suffix}"):
         if tx_type is None:
             st.error("⚠️ Please select Transaction Type (Income or Expense)!")
         elif tx_amount == 0 or tx_description == "":
@@ -129,8 +128,8 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # تفعيل تصفير النموذج
-            reset_form_fields()
+            # زيادة رقم العداد لتهيئة عناصر التحكم النظيفة وتصفير المدخلات تلقائياً
+            st.session_state["form_reset_counter"] += 1
             st.success("✅ Successfully Recorded!")
             st.rerun()
             
@@ -183,39 +182,29 @@ if check_password():
                 df_inc = df_all[df_all['Type'] == 'Income']
                 st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
-                st.write("**Expense Analysis (مصروفات بالتاريخ)**")
+                st.write("**Expense Analysis (المصروفات بالتاريخ)**")
                 df_exp = df_all[df_all['Type'] == 'Expense']
                 st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
-            st.info("No data available yet.")
-
+            st.info("💡 No data available to display in dashboard.")
+            
     with tab2:
-        st.subheader("📅 Daily Transactions Log")
+        st.subheader("📅 All Historical Transactions Log")
         if not df_all.empty:
-            st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_all[["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
         else:
-            st.info("No data available to display.")
+            st.info("💡 No recorded transactions found.")
 
     with tab3:
-        st.subheader("🛠️ Edit or Delete Transactions")
+        st.subheader("🛠️ Modify or Remove a Transaction")
         if not df_all.empty:
-            st.write("📌 **Select a row from the table below to Edit or Delete:**")
+            id_list = df_all["ID"].tolist()
+            selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # عرض الجدول مع خاصية التحديد السطري المفرد
-            event = st.dataframe(
-                df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row"
-            )
+            # جلب بيانات السطر المختار كـ Series صريحة ومباشرة
+            row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            # التحقق مما إذا كان المستخدم قد حدد صفًا
-            if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
-                selected_row_idx = event.selection["rows"][0]
-                selected_row = df_all.iloc[selected_row_idx]
-                
-                st.markdown("---")
-                st.write(f"🔄 **Modifying Transaction ID: {selected_row['ID']}**")
-                
-                # إنشاء حقول التعديل محملة بالبيانات القديمة تلقائياً
+            if "active_action" not in st.session_state:
+                st.session_state["active_action"] = None
+
+            # 1. عرض البيانات بداخل صندوق تنبيه متناسق ومميز
