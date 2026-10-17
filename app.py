@@ -205,7 +205,7 @@ if check_password():
         if not df_all.empty:
             st.write("📌 **Select a row from the table below to Edit or Delete:**")
             
-            # عرض جدول المسح والتعديل التفاعلي الآمن
+            # عرض جدول التعديل التفاعلي مع تفعيل التحديد السطري الصحيح
             event = st.dataframe(
                 df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
                 use_container_width=True,
@@ -214,8 +214,8 @@ if check_password():
                 selection_mode="single-row"
             )
             
-            if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
-                selected_row_idx = event.selection["rows"][0] # التقاط الفهرس الفعلي بدقة
-                selected_row = df_all.iloc[selected_row_idx]
-                
-                st.markdown("---")
+            # استخراج السطر المختار بشكل متوافق تماماً مع تحديثات Streamlit لضمان عمل الشرط فوراً عند التحديد
+            selected_rows = event.get("selection", {}).get("rows", [])
+            
+            if selected_rows:
+                selected_row_idx = selected_rows[0]
