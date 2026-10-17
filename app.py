@@ -207,16 +207,16 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
             
             if selected_id:
-                # جلب السجل الحالي كـ Row منفرد آمن للتعامل مع البيانات
+                # تصفية الداتا فريم وسحب السطر المختار
                 current_row = df_all[df_all["ID"] == selected_id]
                 row_idx = current_row.index
                 
-                # استخراج القيم بشكل مباشر لمنع أخطاء الـ Syntax
-                val_date = pd.to_datetime(current_row["Date"].iloc[0]).date()
-                val_type = current_row["Type"].iloc[0]
-                val_category = current_row["Category"].iloc[0]
-                val_amount = float(current_row["Amount"].iloc[0])
-                val_description = str(current_row["Description"].iloc[0])
+                # جلب القيم الفردية بشكل آمن وصحيح 100% للـ Widgets
+                val_date = pd.to_datetime(current_row["Date"].values[0]).date()
+                val_type = current_row["Type"].values[0]
+                val_category = current_row["Category"].values[0]
+                val_amount = float(current_row["Amount"].values[0])
+                val_description = str(current_row["Description"].values[0])
                 
                 st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
                 
