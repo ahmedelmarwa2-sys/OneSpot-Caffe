@@ -208,7 +208,7 @@ if check_password():
             
             if selected_id:
                 # جلب السجل الحالي لتعديله أو حذفه
-                row_idx = df_all[df_all["ID"] == selected_id].index[0]
+                row_idx = df_all[df_all["ID"] == selected_id].index
                 current_row = df_all.loc[row_idx]
                 
                 st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
@@ -216,8 +216,7 @@ if check_password():
                 with st.form(key=f"edit_form_{selected_id}"):
                     col1, col2 = st.columns(2)
                     with col1:
-                        new_date = st.date_input("Transaction Date:", pd.to_datetime(current_row["Date"]).date())
-                        cats_list = INCOME_CATS if current_row["Type"] == "Income" else EXPENSE_CATS
+                        new_date = st.date_input("Transaction Date:", pd.to_datetime(current_row["Date"].values[0]).date())
+                        cats_list = INCOME_CATS if current_row["Type"].values[0] == "Income" else EXPENSE_CATS
                         try:
-                            cat_index = cats_list.index(current_row["Category"])
-                        except:
+                            cat_index = cats_list.index(current_row["Category"].values[0])
