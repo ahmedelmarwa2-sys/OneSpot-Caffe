@@ -29,7 +29,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns()
     
     with col_img:
         try:
@@ -132,8 +132,8 @@ if check_password():
             
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة الثلاثة)
-    tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
+    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة المتبقية)
+    tab1, tab2 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log"])
     
     with tab1:
         st.subheader("Monthly Performance (Profit & Loss)")
@@ -191,27 +191,3 @@ if check_password():
             st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
         else:
             st.info("No data available to display.")
-
-    with tab3:
-        st.subheader("🛠️ Edit or Delete Transactions Panel")
-        if not df_all.empty:
-            # تجهيز مصفوفة الخيارات النصية للقائمة المنسدلة بشكل دقيق
-            transaction_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
-            selected_option = st.selectbox("🎯 اختر العملية التي تريد تعديلها أو حذفها:", ["-- اختر العملية --"] + transaction_options)
-            
-            if selected_option != "-- اختر العملية --":
-                # معالجة استخراج النص وتحويل المعرف إلى رقم صحيح بطريقة آمنة
-                id_part = selected_option.split("|")[0]
-                target_id = int(id_part.replace("ID:", "").strip())
-                
-                # جلب السطر المطابق للـ ID الفريد
-                matched_rows = df_all[df_all['ID'] == target_id]
-                
-                if not matched_rows.empty:
-                    selected_row = matched_rows.iloc[0]
-                    
-                    st.markdown("---")
-                    st.markdown(f"### 🔄 تعديل بيانات العملية [ المعرف: {target_id} ]")
-                    
-                    col_edit1, col_edit2, col_edit3 = st.columns(3)
-                    
