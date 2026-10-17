@@ -135,8 +135,8 @@ if check_password():
     transaction_form_fragment()
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة المتبقية)
-    tab1, tab2 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log"])
+    # 4. عرض التقارير والجداول المحدثة والتفاعلية الألسنة الثلاثة الجديدة
+    tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🗑️ Delete Actions"])
     
     with tab1:
         st.subheader("Monthly Performance (Profit & Loss)")
@@ -190,18 +190,19 @@ if check_password():
         st.subheader("📅 Daily Transactions Log")
         if not df_all.empty:
             st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
-            
-            # --- جزء حذف القيود المعزول والسريع جداً ---
+        else:
+            st.info("No data available to display.")
+
+    with tab3:
+        st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
+        if not df_all.empty:
+            # جزء مسح قيود منعزل وسريع ومحمي داخل التاب الجديدة
             @st.fragment
-            def delete_transaction_fragment():
-                st.markdown("---")
-                st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
-                
+            def delete_transaction_tab_fragment():
                 global df_all
-                delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
-                selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً:", ["-- اختر القيد --"] + delete_options)
+                delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:30]}...", axis=1).tolist()
+                selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً من الحسابات:", ["-- اختر القيد --"] + delete_options, key="tab_del_select")
                 
                 if selected_to_delete != "-- اختر القيد --":
-                    id_parts = selected_to_delete.split("|")
-                    target_id = int(id_parts[0].replace("ID:", "").strip())
-                    
+                    # استخراج المعرف ID الصافي بشكل آمن ومضمون
+                    raw_parts = selected_to_delete.split("|")[0]
