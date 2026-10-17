@@ -85,6 +85,9 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
+    # دمج كافة الفئات للتأكد من خيارات التعديل بالجدول الذكي
+    ALL_CATS = INCOME_CATS + EXPENSE_CATS
+    
     # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
     if "form_version" not in st.session_state:
         st.session_state["form_version"] = 0
@@ -193,32 +196,17 @@ if check_password():
             st.info("No data available to display.")
 
     with tab3:
-        st.subheader("🛠️ Edit or Delete Transactions")
+        st.subheader("🛠️ Edit or Delete Transactions Inline")
         if not df_all.empty:
-            st.write("📌 **Select a row from the table below to Edit or Delete:**")
+            st.write("💡 **نظام التعديل المباشر الذكي:** يمكنك تعديل أو تغيير أي خانة مباشرة من الجدول بالضغط عليها مرتين، كما يمكنك تحديد السطر واضغط على زر السلة لحذفه، ثم اضغط على زر الحفظ النهائي بالأسفل.")
             
-            event = st.dataframe(
-                df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="edit_table_view"
-            )
-            
-            selected_rows = event.get("selection", {}).get("rows", [])
-            
-            if len(selected_rows) > 0:
-                selected_row_idx = int(selected_rows[0])
-                selected_row = df_all.iloc[selected_row_idx]
-                target_id = int(selected_row['ID'])
-                
-                st.markdown("---")
-                st.markdown(f"### 🔄 Modifying Transaction [ ID: {target_id} ]")
-                
-                col_edit1, col_edit2, col_edit3 = st.columns(3)
-                
-                with col_edit1:
-                    edit_date = st.date_input(
-                        "Edit Date:", 
-                        value=pd.to_datetime(selected_row['Date']).date(),
+            # محرر البيانات الذكي يمنع مشاكل تعارض الأقواس أو أخطاء الصياغة نهائياً
+            edited_df = st.data_editor(
+                df_all,
+                column_config={
+                    "ID": st.column_config.NumberColumn("ID", disabled=True),
+                    "Month_No": st.column_config.NumberColumn("Month No", disabled=True),
+                    "Type": st.column_config.SelectboxColumn("Type", options=["Income", "Expense"], required=True),
+                    "Category": st.column_config.SelectboxColumn("Category", options=ALL_CATS, required=True),
+                    "Amount": st.column_config.NumberColumn("Amount ($)", min_value=0.0, format="$%.2f", required=True),
+                    "Date": st.column_config.TextColumn("Date", required=True),
