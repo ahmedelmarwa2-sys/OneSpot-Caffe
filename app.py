@@ -212,7 +212,7 @@ if check_password():
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # [تم التعديل الحاسم هنا] إضافة .iloc[0] لقراءة عنصر واحد مفرد لمنع التجميد الصامت للـ Widgets
+                    # [الإصلاح الجوهري الحاسم] إضافة [0] لسحب القيم المفردة مباشرة لمنع توقف الكود الصامت
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
