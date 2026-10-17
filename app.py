@@ -138,7 +138,7 @@ if check_password():
                 
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول التفاعلية (الألسنة الثلاثة)
+    # 4. عرض التقارير والجداول التفاعلية (الألسنة الثلاثة) خارج شروط الإدخال تماماً لتعمل دائماً
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
@@ -212,12 +212,10 @@ if check_password():
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # [الإصلاح الجوهري الحاسم] إضافة [0] لسحب القيم المفردة مباشرة لمنع توقف الكود الصامت
+                    # [الحل النهائي والجذري] استخدام .iloc[0] لسحب عناصر مفردة دقيقة تمنع قفل الحقول الصامت تماماً
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
                     val_description = str(filtered_df["Description"].iloc[0])
-                    
-                    st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
                     
