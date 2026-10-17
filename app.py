@@ -85,8 +85,6 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    ALL_CATS = INCOME_CATS + EXPENSE_CATS
-    
     # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
     if "form_version" not in st.session_state:
         st.session_state["form_version"] = 0
@@ -195,20 +193,25 @@ if check_password():
             st.info("No data available to display.")
 
     with tab3:
-        st.subheader("🛠️ Edit or Delete Transactions Inline")
+        st.subheader("🛠️ Edit or Delete Transactions Panel")
         if not df_all.empty:
-            st.write("💡 **نظام التعديل المباشر الذكي:** يمكنك تعديل أو تغيير أي خانة مباشرة من الجدول بالضغط عليها مرتين، كما يمكنك تحديد السطر واضغط على زر Delete في لوحة المفاتيح لحذفه، ثم اضغط على زر الحفظ النهائي بالأسفل.")
+            # 1. قائمة اختيار منسدلة فريدة تعتمد على معرفات المعاملة للتحكم المطلق
+            transaction_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | {r['Amount']} | {r['Description'][:20]}...", axis=1).tolist()
+            selected_option = st.selectbox("🎯 اختر العملية التي تريد تعديلها أو حذفها:", ["-- اختر العملية --"] + transaction_options)
             
-            edited_df = st.data_editor(
-                df_all,
-                column_config={
-                    "ID": st.column_config.NumberColumn("ID", disabled=True),
-                    "Month_No": st.column_config.NumberColumn("Month No", disabled=True),
-                    "Type": st.column_config.SelectboxColumn("Type", options=["Income", "Expense"], required=True),
-                    "Category": st.column_config.SelectboxColumn("Category", options=ALL_CATS, required=True),
-                    "Amount": st.column_config.NumberColumn("Amount ($)", min_value=0.0, format="$%.2f", required=True),
-                    "Date": st.column_config.TextColumn("Date", required=True),
-                    "Description": st.column_config.TextColumn("Description / Notes", required=True)
-                },
-                            use_container_width=True,
-            )
+            if selected_option != "-- اختر العملية --":
+                # استخراج المعرف الفريد للعملية المحددة بدقة
+                target_id = int(selected_option.split("|")[0].replace("ID:", "").strip())
+                selected_row = df_all[df_all['ID'] == target_id].iloc[0]
+                
+                st.markdown("---")
+                st.markdown(f"### 🔄 تعديل بيانات العملية [ المعرف: {target_id} ]")
+                
+                col_edit1, col_edit2, col_edit3 = st.columns(3)
+                
+                with col_edit1:
+                    edit_date = st.date_input(
+                        "تعديل التاريخ:", 
+                        value=pd.to_datetime(selected_row['Date']).date(),
+                        key=f"e_dt_{target_id}"
+                    ))
