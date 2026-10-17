@@ -6,7 +6,7 @@ import os
 # 1. إعدادات الحماية والأمان بالباسورد
 def check_password():
     def password_entered():
-        if st.session_state["password"] == st.secrets["password"]:
+        if st.session_state["password"] == st.secrets.get("password", "onespot123"): # تمت إضافة كلمة مرور افتراضية للتجربة المحلية
             st.session_state["password_correct"] = True
             del st.session_state["password"]  
         else:
@@ -210,12 +210,13 @@ if check_password():
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
-                    row_idx = filtered_df.index
-                    
-                    # [الحل النهائي والجذري] استخدام .iloc[0] لسحب عناصر مفردة دقيقة تمنع قفل الحقول الصامت تماماً
+                    # سحب البيانات المفردة للفاتورة المحددة لعرضها وتعديلها
+                    row_idx = filtered_df.index[0]
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
                     val_description = str(filtered_df["Description"].iloc[0])
                     
+                    # 1. عرض بيانات الفاتورة المحددة للمستخدم
+                    st.info(f"""
