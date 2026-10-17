@@ -214,6 +214,7 @@ if check_password():
                     st.markdown(f"### 🔄 تعديل بيانات العملية [ المعرف: {target_id} ]")
                     
                     col_edit1, col_edit2, col_edit3 = st.columns(3)
-                    
-                    with col_edit1:
                         
+                        with col_edit1:
+                            
+                
