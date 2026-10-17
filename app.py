@@ -39,17 +39,30 @@ if check_password():
     
     DATA_FILE = "cafe_data.csv"
     
-    # [تم الإصلاح هنا] تعديل الدالة لتقرأ الملف وتعرض الحركات اليومية بدون فلترة خاطئة تسبب اختفاء القيود
+    # [تعديل جذري] قراءة البيانات بشكل مرن وإصلاح أي تلف تلقائياً لضمان ظهور القيود في كل الشاشات
     def load_data():
+        columns_layout = ["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]
         if os.path.exists(DATA_FILE):
-            df = pd.read_csv(DATA_FILE)
-            if df.empty:
-                return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
-            if "ID" not in df.columns:
-                df.insert(0, "ID", range(1, len(df) + 1))
-            return df
+            try:
+                df = pd.read_csv(DATA_FILE)
+                if df.empty:
+                    return pd.DataFrame(columns=columns_layout)
+                
+                # إجبار التوافق مع الأعمدة الأساسية
+                for col in columns_layout:
+                    if col not in df.columns:
+                        df[col] = ""
+                
+                # ملء المعرفات (ID) التالفة أو المفقودة
+                if df["ID"].isnull().any() or (df["ID"] == "").any():
+                    df["ID"] = range(1, len(df) + 1)
+                
+                df["ID"] = df["ID"].astype(int)
+                return df
+            except:
+                return pd.DataFrame(columns=columns_layout)
         else:
-            return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
+            return pd.DataFrame(columns=columns_layout)
     
     df_all = load_data()
     st.markdown("---")
@@ -103,7 +116,6 @@ if check_password():
             
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
-            df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
             
             # احتساب الإجماليات والتقارير
             total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
