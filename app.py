@@ -210,13 +210,14 @@ if check_password():
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
-                    # سحب البيانات المفردة للفاتورة المحددة لعرضها وتعديلها
-                    row_idx = filtered_df.index[0]
+                    row_idx = filtered_df.index
+                    
+                    # [تم الإصلاح هنا] إضافة .iloc[0] لحل مشكلة توقف وعطل جلب الحقول نهائياً
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
                     val_description = str(filtered_df["Description"].iloc[0])
                     
-                    # 1. عرض بيانات الفاتورة المحددة للمستخدم
+                    # 1. عرض بيانات الفاتورة المحددة للمستخدم مباشرة
                     st.info(f"""
