@@ -215,6 +215,6 @@ if check_password():
                     
                     col_edit1, col_edit2, col_edit3 = st.columns(3)
                         
-                with col_edit1:
-                            
-                
+with col_edit1:
+    # ضع كود جدول التعديل (st.data_editor) هنا وتأكد من وجود 4 مسافات في البداية
+    edited_df = st.data_editor(df, num_rows="dynamic", key="cafe_editor")
