@@ -189,5 +189,25 @@ if check_password():
         st.subheader("📅 Daily Transactions Log")
         if not df_all.empty:
             st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
-        else:
-            st.info("No data available to display.")
+            
+            # --- إضافة ميزة حذف القيد بأمان وسلاسة أسفل الجدول مباشرة ---
+            st.markdown("---")
+            st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
+            
+            # تجهيز قائمة منسدلة ببيانات القيود الحالية ليسهل عليك معرفة القيد المراد مسحه
+            delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
+            selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً:", ["-- اختر القيد --"] + delete_options)
+            
+            if selected_to_delete != "-- اختر القيد --":
+                # استخراج الـ ID الفريد للقيد بأمان
+                target_id = int(selected_to_delete.split("|")[0].replace("ID:", "").strip())
+                
+                if st.button("❌ تأكيد مسح القيد نهائياً", type="secondary", use_container_width=True):
+                    # إزالة السطر وحفظ السجل الجديد
+                    df_all = df_all[df_all['ID'] != target_id].reset_index(drop=True)
+                    
+                    # إعادة تسلسل الـ ID لتظل الحسابات مرتبة 1، 2، 3...
+                    if not df_all.empty:
+                        df_all["ID"] = range(1, len(df_all) + 1)
+                        
+                    df_all.to_csv(DATA_FILE, index=False)
