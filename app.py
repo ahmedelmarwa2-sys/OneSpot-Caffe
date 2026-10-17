@@ -28,7 +28,6 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    # تم إصلاح القوسين هنا وتحديد أبعاد الأعمدة بدقة [1, 2, 1] لمنع الـ TypeError
     col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
@@ -159,7 +158,6 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # تم ضبط استخدام المعاملات لتجنب التحذيرات المستقبلية
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
                 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
@@ -184,7 +182,7 @@ if check_password():
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
             col_inc, col_exp = st.columns(2)
             with col_inc:
-                st.write("**Income Analysis (الإيرادات بالتاريخ)**")
+                st.write("**Income Analysis (إيرادات بالتاريخ)**")
                 df_inc = df_all[df_all['Type'] == 'Income']
                 st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
@@ -209,14 +207,17 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
             
             if selected_id:
-                # تصفية وجلب السجل
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # استخدام .iloc[0] لسحب القيم الفردية بشكل سليم وقاطع لمنع أي أخطاء صامتة
+                    # [تم التعديل الحاسم هنا] إضافة .iloc[0] لقراءة عنصر واحد مفرد لمنع التجميد الصامت للـ Widgets
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
+                    val_description = str(filtered_df["Description"].iloc[0])
+                    
+                    st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
+                    
