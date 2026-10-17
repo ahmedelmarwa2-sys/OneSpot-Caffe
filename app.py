@@ -28,7 +28,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns()
     
     with col_img:
         try:
@@ -207,15 +207,18 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
             
             if selected_id:
-                # تصفية الداتا فريم والحصول على السجل المختار مباشرة
+                # تصفية الداتا فريم والحصول على السجل المختار
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
-                    # سحب القيم المباشرة والآمنة لكل حقل بشكل مستقل تماماً لمنع الاختفاء
-                    row_idx = filtered_df.index[0]
-                    val_date = pd.to_datetime(filtered_df["Date"].values[0]).date()
-                    val_type = str(filtered_df["Type"].values[0])
-                    val_category = str(filtered_df["Category"].values[0])
-                    val_amount = float(filtered_df["Amount"].values[0])
-                    val_description = str(filtered_df["Description"].values[0])
+                    row_idx = filtered_df.index
+                    # تعديل جوهري آمن: قراءة الصف الأول كقيم فردية صحيحة 100%
+                    row_data = filtered_df.iloc[0]
                     
+                    val_date = pd.to_datetime(row_data["Date"]).date()
+                    val_type = str(row_data["Type"])
+                    val_category = str(row_data["Category"])
+                    val_amount = float(row_data["Amount"])
+                    val_description = str(row_data["Description"])
+                    
+                    st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
