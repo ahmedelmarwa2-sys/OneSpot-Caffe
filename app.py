@@ -85,14 +85,13 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # استخدام مفتاح تحديث فريد لضمان تصفير النموذج بطريقة مستقرة ودون أخطاء widget تعارضية
+    # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
     if "form_version" not in st.session_state:
         st.session_state["form_version"] = 0
 
     # 3. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
-    # ربط جميع المفاتيح بالـ form_version لضمان التصفير النظيف
     v = st.session_state["form_version"]
     tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"tx_date_key_{v}")
     tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{v}")
@@ -127,7 +126,6 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # رفع الـ version لتصفير الحقول بشكل رسمي ونظيف
             st.session_state["form_version"] += 1
             st.success("✅ Successfully Recorded!")
             st.rerun()
@@ -209,13 +207,15 @@ if check_password():
                 key="edit_table_view"
             )
             
-            # التقاط مصفوفة السطور المحددة
+            # التقاط مصفوفة السطور المحددة من جدول الـ Streamlit
             selected_rows = event.get("selection", {}).get("rows", [])
             
             if len(selected_rows) > 0:
-                selected_row_idx = selected_rows[0] # جلب الرقم الأول الفعلي بدقة من المصفوفة
+                # استخراج الفهرس الرقمي للسطر الأول المختار من داخل المصفوفة بدقة
+                selected_row_idx = int(selected_rows[0]) 
                 selected_row = df_all.iloc[selected_row_idx]
                 
                 st.markdown("---")
                 st.markdown(f"### 🔄 Modifying Transaction [ ID: {selected_row['ID']} ]")
                 
+                # حقول التعديل محملة بمفاتيح خاصة منفصلة تماماً ومحمية تعتمد على الفهرس
