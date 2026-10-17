@@ -3,6 +3,9 @@ import pandas as pd
 import datetime
 import os
 
+# ضبط إعدادات الصفحة لتكون عريضة واحترافية من أول سطر
+st.set_page_config(page_title="OneSpot Cafe System", page_icon="☕", layout="wide")
+
 # 1. إعدادات الحماية والأمان بالباسورد (نسخة التشغيل المحلي)
 def check_password():
     def password_entered():
@@ -13,7 +16,6 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
         st.title("🔒 Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
@@ -28,7 +30,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
-    col_space1, col_img, col_space2 = st.columns(3)
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     with col_img:
         try:
             st.image("banner.png", use_container_width=True)
@@ -39,25 +41,28 @@ if check_password():
     
     DATA_FILE = "cafe_data.csv"
     
-    # [تعديل جذري] قراءة البيانات بشكل مرن وإصلاح أي تلف تلقائياً لضمان ظهور القيود في كل الشاشات
+    # دالة قراءة البيانات المؤمنة كلياً لضمان عدم اختفاء القيود من أي شاشة
     def load_data():
         columns_layout = ["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]
         if os.path.exists(DATA_FILE):
             try:
                 df = pd.read_csv(DATA_FILE)
-                if df.empty:
+                if df.empty or len(df.columns) == 0:
                     return pd.DataFrame(columns=columns_layout)
                 
-                # إجبار التوافق مع الأعمدة الأساسية
+                # التأكد من مطابقة ستايل الأعمدة
                 for col in columns_layout:
                     if col not in df.columns:
                         df[col] = ""
                 
-                # ملء المعرفات (ID) التالفة أو المفقودة
-                if df["ID"].isnull().any() or (df["ID"] == "").any():
-                    df["ID"] = range(1, len(df) + 1)
-                
-                df["ID"] = df["ID"].astype(int)
+                # إصلاح المعرفات (ID) لتجنب أي تداخل
+                df["ID"] = range(1, len(df) + 1)
+                df["Amount"] = pd.to_numeric(df["Amount"], errors='coerce').fillna(0.0)
+                df["Month_No"] = pd.to_numeric(df["Month_No"], errors='coerce').fillna(1).astype(int)
+                df["Date"] = df["Date"].astype(str)
+                df["Category"] = df["Category"].astype(str)
+                df["Type"] = df["Type"].astype(str)
+                df["Description"] = df["Description"].astype(str)
                 return df
             except:
                 return pd.DataFrame(columns=columns_layout)
@@ -100,7 +105,7 @@ if check_password():
                 st.error("⚠️ Please fill in all fields!")
             else:
                 next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": int(tx_date.month), "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
+                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": int(tx_date.month), "Category: ": tx_category, "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
                 st.session_state["radio_reset_key"] += 1
@@ -115,8 +120,6 @@ if check_password():
         st.subheader("Monthly Performance (Profit & Loss)")
             
         if not df_all.empty:
-            df_all['Amount'] = pd.to_numeric(df_all['Amount'])
-            
             # احتساب الإجماليات والتقارير
             total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
@@ -168,10 +171,6 @@ if check_password():
                     st.write("No expenses recorded.")
                     exp_html_rows = "<tr><td colspan='3'>No expense data.</td></tr>"
 
-            # إنشاء أسطر جدول الملخص الشهري
             summary_html_rows = ""
             for _, row in monthly_summary.iterrows():
                 profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
-                summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
-
-            # كود التنسيق النظيف المجهز للطباعة الفورية الورقية
