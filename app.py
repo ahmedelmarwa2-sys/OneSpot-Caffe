@@ -40,22 +40,23 @@ if check_password():
     st.markdown("<div style='text-align: center; margin-top: 5px; margin-bottom: 25px;'><p style='font-family: \"Segoe UI\", sans-serif; font-size: 20px; color: #7f8c8d; font-weight: 500; letter-spacing: 1px;'>Financial Management System</p></div>", unsafe_allow_html=True)
     
     DATA_FILE = "cafe_data.csv"
+    columns_layout = ["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]
     
-    # دالة قراءة البيانات المؤمنة كلياً لضمان عدم اختفاء القيود من أي شاشة
+    # دالة قراءة وتأمين البيانات وبنائها برمجياً لكسر التلف القديم
     def load_data():
-        columns_layout = ["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]
         if os.path.exists(DATA_FILE):
             try:
                 df = pd.read_csv(DATA_FILE)
-                if df.empty or len(df.columns) == 0:
+                # إذا تسبب الملف القديم في قراءة فارغة أو مكسورة، يتم تصفيره وبنائه فوراً
+                if df.empty or not isinstance(df, pd.DataFrame) or "Amount" not in df.columns:
                     return pd.DataFrame(columns=columns_layout)
                 
-                # التأكد من مطابقة ستايل الأعمدة
+                # إجبار الأعمدة على التطابق التام
                 for col in columns_layout:
                     if col not in df.columns:
                         df[col] = ""
                 
-                # إصلاح المعرفات (ID) لتجنب أي تداخل
+                # تأمين أرقام الـ ID والعمليات الحسابية
                 df["ID"] = range(1, len(df) + 1)
                 df["Amount"] = pd.to_numeric(df["Amount"], errors='coerce').fillna(0.0)
                 df["Month_No"] = pd.to_numeric(df["Month_No"], errors='coerce').fillna(1).astype(int)
@@ -105,7 +106,7 @@ if check_password():
                 st.error("⚠️ Please fill in all fields!")
             else:
                 next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": int(tx_date.month), "Category: ": tx_category, "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
+                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": int(tx_date.month), "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
                 st.session_state["radio_reset_key"] += 1
