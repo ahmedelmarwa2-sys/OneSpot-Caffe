@@ -183,32 +183,39 @@ if check_password():
                 df_inc = df_all[df_all['Type'] == 'Income']
                 st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
-                st.write("**Expense Analysis (المصروفات بالتاريخ)**")
+                st.write("**Expense Analysis (مصروفات بالتاريخ)**")
                 df_exp = df_all[df_all['Type'] == 'Expense']
                 st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
-            st.info("💡 No data available to display in dashboard.")
-            
+            st.info("No data available yet.")
+
     with tab2:
-        st.subheader("📅 All Historical Transactions Log")
+        st.subheader("📅 Daily Transactions Log")
         if not df_all.empty:
-            st.dataframe(df_all[["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
         else:
-            st.info("💡 No recorded transactions found.")
+            st.info("No data available to display.")
 
     with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
+        st.subheader("🛠️ Edit or Delete Transactions")
         if not df_all.empty:
-            id_list = df_all["ID"].tolist()
-            selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
+            st.write("📌 **Select a row from the table below to Edit or Delete:**")
             
-            # جلب بيانات السطر المختار كـ Series صريحة ومباشرة
-            row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
+            # عرض الجدول مع خاصية التحديد السطري المفرد
+            event = st.dataframe(
+                df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
+            )
             
-            # إعداد مساحة تخزين آمنة للعمليات التفاعلية لمنع التوقف الصامت للواجهة
-            if "active_action" not in st.session_state:
-                st.session_state["active_action"] = None
-
-            # 1. عرض البيانات بداخل صندوق تنبيه متناسق
-            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
-            
+            # التحقق مما إذا كان المستخدم قد حدد صفًا
+            if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
+                selected_row_idx = event.selection["rows"][0]
+                selected_row = df_all.iloc[selected_row_idx]
+                
+                st.markdown("---")
+                st.write(f"🔄 **Modifying Transaction ID: {selected_row['ID']}**")
+                
+                # إنشاء حقول التعديل محملة بالبيانات القديمة تلقائياً
