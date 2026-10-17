@@ -212,7 +212,7 @@ if check_password():
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # تعديل الأسطر هنا بإضافة [0].iloc لجلب البيانات بشكل سليم ومنع توقف اللوحة عن العرض
+                    # [تم الإصلاح الجذري هنا] إضافة [0] لقراءة العنصر الأول بشكل صحيح منعاً لتوقف كود Streamlit عن العرض
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
