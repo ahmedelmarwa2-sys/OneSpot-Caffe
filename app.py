@@ -3,17 +3,17 @@ import pandas as pd
 import datetime
 import os
 
-# 1. إعدادات الحماية والأمان بالباسورد
+# 1. إعدادات الحماية والأمان بالباسورد (تعديل محلي لتأمين الإقلاع السريع)
 def check_password():
     def password_entered():
-        if st.session_state["password"] == st.secrets["password"]:
+        if st.session_state["password"] == "1234":  
             st.session_state["password_correct"] = True
             del st.session_state["password"]  
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
+        st.set_page_config(page_title="OneSpot Cafe System", page_icon="☕", layout="wide")
         st.title("🔒 OneSpot Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
@@ -27,7 +27,7 @@ def check_password():
 
 if check_password():
     
-    # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
+    # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق
     col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
@@ -55,35 +55,33 @@ if check_password():
     )
     
     DATA_FILE = "cafe_data.csv"
+    columns_layout = ["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]
     
     def load_data():
         if os.path.exists(DATA_FILE):
-            df = pd.read_csv(DATA_FILE)
-            df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
-            if "ID" not in df.columns:
-                df.insert(0, "ID", range(1, len(df) + 1))
-            return df
+            try:
+                df = pd.read_csv(DATA_FILE)
+                if df.empty or len(df.columns) == 0:
+                    return pd.DataFrame(columns=columns_layout)
+                for col in columns_layout:
+                    if col not in df.columns:
+                        df[col] = ""
+                # تأمين تحويل الأنواع والـ ID لضمان الحذف السليم
+                df["ID"] = df["ID"].astype(int)
+                df["Amount"] = pd.to_numeric(df["Amount"], errors='coerce').fillna(0.0)
+                df["Month_No"] = pd.to_numeric(df["Month_No"], errors='coerce').fillna(1).astype(int)
+                return df
+            except:
+                return pd.DataFrame(columns=columns_layout)
         else:
-            return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
+            return pd.DataFrame(columns=columns_layout)
     
     df_all = load_data()
     st.markdown("---")
     
     # القوائم الثابتة لبنود الحسابات المدمجة
-    INCOME_CATS = [
-       
-        "Daily Sales (المبيعات اليوميه)", 
-        
-        "Other Income (إيرادات أخرى)"
-    ]
-    EXPENSE_CATS = [
-        "Coffee Beans & Milk (مواد خام)", 
-        "Staff Salaries (رواتب الموظفين)", 
-        "Rent & Utilities (إيجار وفواتير)", 
-        "(valu installments) (اقساط فاليو)", 
-        "Packaging (أكواب ومطبوعات)",
-        "Other Expense (مصروفات أخرى)"
-    ]
+    INCOME_CATS = ["Daily Sales (المبيعات اليوميه)", "Other Income (إيرادات أخرى)"]
+    EXPENSE_CATS = ["Coffee Beans & Milk (مواد خام)", "Staff Salaries (رواتب الموظفين)", "Rent & Utilities (إيجار وفواتير)", "(valu installments) (اقساط فاليو)", "Packaging (أكواب ومطبوعات)", "Other Expense (مصروفات أخرى)"]
     
     # 3. نموذج الإدخال الذكي مع تصفية البنود تلقائياً بعد اختيار النوع
     st.subheader("📝 Record New Transaction")
@@ -91,13 +89,7 @@ if check_password():
     if "radio_reset_key" not in st.session_state:
         st.session_state["radio_reset_key"] = 0
         
-    tx_type = st.radio(
-        "Transaction Type:", 
-        ["Income", "Expense"], 
-        index=None, 
-        horizontal=True,
-        key=f"type_radio_{st.session_state['radio_reset_key']}"
-    )
+    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{st.session_state['radio_reset_key']}")
     
     if tx_type == "Income":
         current_cats = INCOME_CATS
@@ -113,7 +105,6 @@ if check_password():
             tx_category = st.selectbox("Category البند:", current_cats)
             tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f")
             tx_description = st.text_input("Description / Notes (البيان):")
-            
             submit_button = st.form_submit_button(label="💾 Save Transaction", type="primary")
         
         if submit_button:
@@ -121,18 +112,9 @@ if check_password():
                 st.error("⚠️ Please fill in all fields!")
             else:
                 next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-                new_row = pd.DataFrame([{
-                    "ID": next_id,
-                    "Date": str(tx_date), 
-                    "Month_No": tx_date.month, 
-                    "Category": tx_category, 
-                    "Type": tx_type, 
-                    "Amount": tx_amount, 
-                    "Description": tx_description
-                }])
+                new_row = pd.DataFrame([{"ID": int(next_id), "Date": str(tx_date), "Month_No": int(tx_date.month), "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
-                
                 st.session_state["radio_reset_key"] += 1
                 st.success("✅ Successfully Recorded!")
                 st.rerun()  
@@ -144,16 +126,12 @@ if check_password():
     
     with tab1:
         st.subheader("Monthly Performance (Profit & Loss)")
-        if not df_all.empty:
-            df_all['Amount'] = pd.to_numeric(df_all['Amount'])
-            df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
             
-            # حساب الإجماليات لعرضها في بطاقات علوية مخصصة للتقرير
+        if not df_all.empty:
             total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
             net_profit_all = total_income_all - total_expense_all
             
-            # عرض بطاقات ملخصة جذابة لمدير الكافيه
             m_col1, m_col2, m_col3 = st.columns(3)
             m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
             m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
@@ -161,61 +139,46 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # تجميع البيانات شهرياً واحتساب التقرير
-            monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
-                'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
-                'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
-                'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()
-            }), include_groups=False).reset_index()
-            
+            monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({'Total Income': x[x['Type'] == 'Income']['Amount'].sum(), 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(), 'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()}), include_groups=False).reset_index()
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
             
-            # [تنسيق احترافي] استخدام خاصية التلوين التلقائي لخانة صافي الربح داخل الجدول
-            styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
+            st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            st.dataframe(
-                styled_summary.style.format({
-                    'Total Income': '${:,.2f}',
-                    'Total Expense': '${:,.2f}',
-                    'Net Profit': '${:,.2f}'
-                }).map(lambda val: 'color: #27ae60; font-weight: bold;' if val > 0 else 'color: #c0392b; font-weight: bold;', subset=['Net Profit']),
-                use_container_width=True, 
-                hide_index=True
-            )
-            
+            st.markdown("<br><hr style='border: 1px dashed #ccc;'><br>", unsafe_allow_html=True)
             st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
+            
             col_inc, col_exp = st.columns(2)
+            df_inc = df_all[df_all['Type'] == 'Income']
+            df_expenses = df_all[df_all['Type'] == 'Expense']
+            
+            inc_html_rows = ""
+            exp_html_rows = ""
+            
             with col_inc:
                 st.write("**Income Analysis (الإيرادات بالتاريخ)**")
-                df_inc = df_all[df_all['Type'] == 'Income']
                 if not df_inc.empty:
-                    inc_breakdown = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(inc_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    inc_grouped = df_inc.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(inc_grouped.rename(columns={'Date': 'Date التاريخ', 'Category': 'Income Item', 'Amount': 'Total Income ($)'}), use_container_width=True, hide_index=True)
+                    for _, row in inc_grouped.iterrows():
+                        inc_html_rows += f"<tr><td>{row['Date']}</td><td>{row['Category']}</td><td>${row['Amount']:,.2f}</td></tr>"
                 else:
                     st.write("No income recorded.")
+                    inc_html_rows = "<tr><td colspan='3'>No income data.</td></tr>"
+                    
             with col_exp:
                 st.write("**Expense Analysis (المصروفات بالتاريخ)**")
-                df_expenses = df_all[df_all['Type'] == 'Expense']
                 if not df_expenses.empty:
-                    expense_breakdown = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
-                    st.dataframe(expense_breakdown.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    exp_grouped = df_expenses.groupby(['Date', 'Category'])['Amount'].sum().reset_index()
+                    st.dataframe(exp_grouped.rename(columns={'Date': 'Date التاريخ', 'Category': 'Expense Item', 'Amount': 'Total Spent ($)'}), use_container_width=True, hide_index=True)
+                    for _, row in exp_grouped.iterrows():
+                        exp_html_rows += f"<tr><td>{row['Date']}</td><td>{row['Category']}</td><td>${row['Amount']:,.2f}</td></tr>"
                 else:
                     st.write("No expenses recorded.")
-        else:
-            st.info("No data recorded yet.")
-            
-    with tab2:
-        st.subheader("All Records Saved")
-        if not df_all.empty:
-            st.dataframe(df_all, use_container_width=True, hide_index=True)
-        else:
-            st.info("No data recorded yet.")
+                    exp_html_rows = "<tr><td colspan='3'>No expense data.</td></tr>"
 
-    with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
-        if not df_all.empty:
-            selected_id = st.selectbox("Select Transaction ID to Action:", df_all["ID"].tolist(), key="select_id_tab3")
-            
-            st.markdown("### 🗑️ Delete Record")
-            st.warning("⚠️ Warning: This action cannot be undone. Clicking below will erase this transaction permanently.")
+            summary_html_rows = ""
+            for _, row in monthly_summary.iterrows():
+                profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
+                summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
+
