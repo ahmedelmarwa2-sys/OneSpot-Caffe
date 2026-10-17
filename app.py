@@ -29,7 +29,7 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
+    col_space1, col_img, col_space2 = st.columns()
     
     with col_img:
         try:
@@ -205,14 +205,10 @@ if check_password():
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
             # إعداد الحاوية العلوية المقسمة إلى جزئين (البيانات يساراً، والأزرار يميناً تماماً كالصورة المرفقة)
-            box_col_data, box_col_actions = st.columns([3, 1])
+            box_col_data, box_col_actions = st.columns(2)
             
             with box_col_data:
-                st.info(f"""
-                📋 **Current Invoice Data (بيانات الفاتورة الحالية):**
-                * **Type:** {row_data['Type']} | **Category:** {row_data['Category']}
-                * **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}
-                * **Description:** {row_data['Description']}
-                """)
+                st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
                 
             with box_col_actions:
+                st.write(" ") # تم إصلاح الفراغ البرمجي لمنع الـ IndentationError
