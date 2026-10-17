@@ -39,10 +39,12 @@ if check_password():
     
     DATA_FILE = "cafe_data.csv"
     
+    # [تم الإصلاح هنا] تعديل الدالة لتقرأ الملف وتعرض الحركات اليومية بدون فلترة خاطئة تسبب اختفاء القيود
     def load_data():
         if os.path.exists(DATA_FILE):
             df = pd.read_csv(DATA_FILE)
-            df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
+            if df.empty:
+                return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
             return df
@@ -50,17 +52,19 @@ if check_password():
             return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
     
     df_all = load_data()
-    
     st.markdown("---")
+    
+    # القوائم الثابتة لبنود الحسابات المدمجة
+    INCOME_CATS = ["Takeaway (سفره وسيارة)", "Daily Sales (المبيعات اليوميه)", "PS (play staion)", "Other Income (إيرادات أخرى)"]
+    EXPENSE_CATS = ["Coffee Beans & Milk (مواد خام)", "Staff Salaries (رواتب الموظفين)", "Rent & Utilities (إيجار وفواتير)", "(valu installments) (اقساط فاليو)", "Packaging (أكواب ومطبوعات)", "Other Expense (مصروفات أخرى)"]
+    
+    # 3. نموذج الإدخال الذكي مع تصفية البنود تلقائياً بعد اختيار النوع
     st.subheader("📝 Record New Transaction")
     
     if "radio_reset_key" not in st.session_state:
         st.session_state["radio_reset_key"] = 0
         
     tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{st.session_state['radio_reset_key']}")
-    
-    INCOME_CATS = ["Takeaway (سفره وسيارة)", "Daily Sales (المبيعات اليوميه)", "PS (play staion)", "Other Income (إيرادات أخرى)"]
-    EXPENSE_CATS = ["Coffee Beans & Milk (مواد خام)", "Staff Salaries (رواتب الموظفين)", "Rent & Utilities (إيجار وفواتير)", "(valu installments) (اقساط فاليو)", "Packaging (أكواب ومطبوعات)", "Other Expense (مصروفات أخرى)"]
     
     if tx_type == "Income":
         current_cats = INCOME_CATS
@@ -83,7 +87,7 @@ if check_password():
                 st.error("⚠️ Please fill in all fields!")
             else:
                 next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": tx_date.month, "Category": tx_category, "Type": tx_type, "Amount": tx_amount, "Description": tx_description}])
+                new_row = pd.DataFrame([{"ID": next_id, "Date": str(tx_date), "Month_No": int(tx_date.month), "Category": tx_category, "Type": tx_type, "Amount": float(tx_amount), "Description": tx_description}])
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
                 st.session_state["radio_reset_key"] += 1
@@ -106,7 +110,7 @@ if check_password():
             total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
             net_profit_all = total_income_all - total_expense_all
             
-            # عرض لوحة التحكم التفاعلية كالمعتاد
+            # عرض لوحة التحكم التفاعلية
             m_col1, m_col2, m_col3 = st.columns(3)
             m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
             m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
