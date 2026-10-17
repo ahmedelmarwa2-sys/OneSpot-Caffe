@@ -207,17 +207,15 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
             
             if selected_id:
+                # تصفية الداتا فريم والحصول على السجل المختار مباشرة
                 filtered_df = df_all[df_all["ID"] == selected_id]
-                row_idx = filtered_df.index
-                records = filtered_df.to_dict('records')
                 
-                if records:
-                    # تفكيك المصفوفة المباشر باستخدام الاندكس [0] لضمان جلب قيم مفردة صحيحة لجميع الحقول
-                    item = records[0]
+                if not filtered_df.empty:
+                    # سحب القيم المباشرة والآمنة لكل حقل بشكل مستقل تماماً لمنع الاختفاء
+                    row_idx = filtered_df.index[0]
+                    val_date = pd.to_datetime(filtered_df["Date"].values[0]).date()
+                    val_type = str(filtered_df["Type"].values[0])
+                    val_category = str(filtered_df["Category"].values[0])
+                    val_amount = float(filtered_df["Amount"].values[0])
+                    val_description = str(filtered_df["Description"].values[0])
                     
-                    st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
-                    
-                    with st.form(key=f"edit_form_{selected_id}"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            current_date_val = pd.to_datetime(item["Date"]).date()
