@@ -158,4 +158,4 @@ if check_password():
                 profit_color = "#27ae60" if row['Net Profit'] >= 0 else "#c0392b"
                 summary_html_rows += f"<tr><td>{row['Month']}</td><td>${row['Total Income']:,.2f}</td><td>${row['Total Expense']:,.2f}</td><td style='color:{profit_color}; font-weight:bold;'>${row['Net Profit']:,.2f}</td></tr>"
 
-            # [الحل النهائي والجذري للتخلص من ستايل الحروف والأقواس المتعرجة وبناء التقرير بأمان]
+            # كود التنسيق النظيف المجهز للطباعة الفورية الورقية
