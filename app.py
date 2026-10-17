@@ -135,7 +135,7 @@ if check_password():
     transaction_form_fragment()
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول المحدثة والتفاعلية الألسنة الثلاثة الجديدة
+    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة الثلاثة)
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🗑️ Delete Actions"])
     
     with tab1:
@@ -194,7 +194,7 @@ if check_password():
             st.info("No data available to display.")
 
     with tab3:
-        st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
+        st.subheader("🗑️ Delete a Transaction (مصدر مسح القيود)")
         if not df_all.empty:
             # جزء مسح قيود منعزل وسريع ومحمي داخل التاب الجديدة
             @st.fragment
@@ -204,5 +204,4 @@ if check_password():
                 selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً من الحسابات:", ["-- اختر القيد --"] + delete_options, key="tab_del_select")
                 
                 if selected_to_delete != "-- اختر القيد --":
-                    # استخراج المعرف ID الصافي بشكل آمن ومضمون
-                    raw_parts = selected_to_delete.split("|")[0]
+                    # إصلاح طريقة سحب الـ ID بتحديد العنصر الأول [0] من مصفوفة الانقسام
