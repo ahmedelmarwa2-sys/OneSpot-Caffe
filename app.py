@@ -57,25 +57,20 @@ if check_password():
     
     DATA_FILE = "cafe_data.csv"
     
-    def load_data():
-        if os.path.exists(DATA_FILE):
-            df = pd.read_csv(DATA_FILE)
-            df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
-            if "ID" not in df.columns:
-                df.insert(0, "ID", range(1, len(df) + 1))
-            df["ID"] = df["ID"].astype(int)
-            return df
-        else:
-            return pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
-    
-    df_all = load_data()
+    # قراءة سريعة ومحمية للبيانات
+    if os.path.exists(DATA_FILE):
+        df_all = pd.read_csv(DATA_FILE)
+        df_all = df_all.dropna(subset=["Category", "Amount", "Type"], how="any")
+        if "ID" not in df_all.columns:
+            df_all.insert(0, "ID", range(1, len(df_all) + 1))
+        df_all["ID"] = df_all["ID"].astype(int)
+    else:
+        df_all = pd.DataFrame(columns=["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"])
+        
     st.markdown("---")
     
     # القوائم الثابتة لبنود الحسابات المدمجة الخاصة بـ OneSpot Cafe
-    INCOME_CATS = [
-        "Daily Sales (المبيعات اليوميه)", 
-        "Other Income (إيرادات أخرى)"
-    ]
+    INCOME_CATS = ["Daily Sales (المبيعات اليوميه)", "Other Income (إيرادات أخرى)"]
     EXPENSE_CATS = [
         "Coffee Beans & Milk (مواد خام)", 
         "Staff Salaries (رواتب الموظفين)", 
@@ -85,51 +80,49 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
-    if "form_version" not in st.session_state:
-        st.session_state["form_version"] = 0
-
-    # 3. نموذج الإدخال
-    st.subheader("📝 Record New Transaction")
-    
-    v = st.session_state["form_version"]
-    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"tx_date_key_{v}")
-    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{v}")
-    
-    if tx_type == "Income":
-        tx_category = st.selectbox("Category البند:", INCOME_CATS, key=f"income_select_{v}")
-    elif tx_type == "Expense":
-        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key=f"expense_select_{v}")
-    else:
-        st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
-        tx_category = None
+    # --- جزء إدخال البيانات فائق السرعة والمحمي ضد التحديث الكامل للصفحة ---
+    @st.fragment
+    def transaction_form_fragment():
+        st.subheader("📝 Record New Transaction")
         
-    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key=f"tx_amount_key_{v}")
-    tx_description = st.text_input("Description / Notes (البيان):", key=f"tx_description_key_{v}")
-    
-    if st.button("💾 Save Transaction", type="primary"):
-        if tx_type is None:
-            st.error("⚠️ Please select Transaction Type (Income or Expense)!")
-        elif tx_amount == 0 or tx_description == "":
-            st.error("⚠️ Please fill in all fields!")
+        tx_date = st.date_input("Transaction Date:", datetime.date.today())
+        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
+        
+        if tx_type == "Income":
+            tx_category = st.selectbox("Category البند:", INCOME_CATS)
+        elif tx_type == "Expense":
+            tx_category = st.selectbox("Category البند:", EXPENSE_CATS)
         else:
-            next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
-            new_row = pd.DataFrame([{
-                "ID": next_id,
-                "Date": str(tx_date), 
-                "Month_No": int(tx_date.month), 
-                "Category": tx_category, 
-                "Type": tx_type, 
-                "Amount": tx_amount, 
-                "Description": tx_description
-            }])
-            df_all = pd.concat([df_all, new_row], ignore_index=True)
-            df_all.to_csv(DATA_FILE, index=False)
+            st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
+            tx_category = None
             
-            st.session_state["form_version"] += 1
-            st.success("✅ Successfully Recorded!")
-            st.rerun()
-            
+        tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f")
+        tx_description = st.text_input("Description / Notes (البيان):")
+        
+        if st.button("💾 Save Transaction", type="primary"):
+            if tx_type is None:
+                st.error("⚠️ Please select Transaction Type (Income or Expense)!")
+            elif tx_amount == 0 or tx_description == "":
+                st.error("⚠️ Please fill in all fields!")
+            else:
+                global df_all
+                next_id = int(df_all["ID"].max() + 1) if not df_all.empty else 1
+                new_row = pd.DataFrame([{
+                    "ID": next_id,
+                    "Date": str(tx_date), 
+                    "Month_No": int(tx_date.month), 
+                    "Category": tx_category, 
+                    "Type": tx_type, 
+                    "Amount": tx_amount, 
+                    "Description": tx_description
+                }])
+                df_all = pd.concat([df_all, new_row], ignore_index=True)
+                df_all.to_csv(DATA_FILE, index=False)
+                st.success("✅ Successfully Recorded!")
+                st.rerun()
+
+    # تشغيل نموذج الإدخال السريع
+    transaction_form_fragment()
     st.markdown("---")
     
     # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة المتبقية)
@@ -152,16 +145,16 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
-                'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
-                'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
-                'Net Profit': x[x['Type'] == 'Income']['Amount'].sum() - x[x['Type'] == 'Expense']['Amount'].sum()
-            }), include_groups=False).reset_index()
+            # احتساب مالي سريع ومباشر ومحسن للأداء
+            pivot_df = df_all.pivot_table(index='Month_No', columns='Type', values='Amount', aggfunc='sum').fillna(0).reset_index()
+            if 'Income' not in pivot_df.columns: pivot_df['Income'] = 0.0
+            if 'Expense' not in pivot_df.columns: pivot_df['Expense'] = 0.0
             
+            pivot_df['Net Profit'] = pivot_df['Income'] - pivot_df['Expense']
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
-            monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
+            pivot_df['Month'] = pivot_df['Month_No'].map(months_names)
             
-            styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
+            styled_summary = pivot_df.rename(columns={'Income': 'Total Income', 'Expense': 'Total Expense'})[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
             st.dataframe(
                 styled_summary.style.format({
                     'Total Income': '${:,.2f}',
@@ -176,12 +169,10 @@ if check_password():
             col_inc, col_exp = st.columns(2)
             with col_inc:
                 st.write("**Income Analysis (إيرادات بالتاريخ)**")
-                df_inc = df_all[df_all['Type'] == 'Income']
-                st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
+                st.dataframe(df_all[df_all['Type'] == 'Income'][['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
                 st.write("**Expense Analysis (مصروفات بالتاريخ)**")
-                df_exp = df_all[df_all['Type'] == 'Expense']
-                st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
+                st.dataframe(df_all[df_all['Type'] == 'Expense'][['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
             st.info("No data available yet.")
 
@@ -190,24 +181,28 @@ if check_password():
         if not df_all.empty:
             st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
             
-            # --- إضافة ميزة حذف القيد بأمان وسلاسة أسفل الجدول مباشرة ---
-            st.markdown("---")
-            st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
-            
-            # تجهيز قائمة منسدلة ببيانات القيود الحالية ليسهل عليك معرفة القيد المراد مسحه
-            delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
-            selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً:", ["-- اختر القيد --"] + delete_options)
-            
-            if selected_to_delete != "-- اختر القيد --":
-                # استخراج الـ ID الفريد للقيد بأمان
-                target_id = int(selected_to_delete.split("|")[0].replace("ID:", "").strip())
+            # --- جزء حذف القيود المعزول والسريع جداً ---
+            @st.fragment
+            def delete_transaction_fragment():
+                st.markdown("---")
+                st.subheader("🗑️ Delete a Transaction (مسح قيد يومي)")
                 
-                if st.button("❌ تأكيد مسح القيد نهائياً", type="secondary", use_container_width=True):
-                    # إزالة السطر وحفظ السجل الجديد
-                    df_all = df_all[df_all['ID'] != target_id].reset_index(drop=True)
+                global df_all
+                delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
+                selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً:", ["-- اختر القيد --"] + delete_options)
+                
+                if selected_to_delete != "-- اختر القيد --":
+                    id_parts = selected_to_delete.split("|")
+                    target_id = int(id_parts[0].replace("ID:", "").strip())
                     
-                    # إعادة تسلسل الـ ID لتظل الحسابات مرتبة 1، 2، 3...
-                    if not df_all.empty:
-                        df_all["ID"] = range(1, len(df_all) + 1)
+                    if st.button("❌ تأكيد مسح القيد نهائياً", type="secondary", use_container_width=True):
+                        df_all = df_all[df_all['ID'] != target_id].reset_index(drop=True)
+                        if not df_all.empty:
+                            df_all["ID"] = range(1, len(df_all) + 1)
+                        df_all.to_csv(DATA_FILE, index=False)
+                        st.success(f"✅ تم مسح القيد رقم {target_id} بنجاح تحديث السجلات!")
+                        st.rerun()
                         
-                    df_all.to_csv(DATA_FILE, index=False)
+            delete_transaction_fragment()
+        else:
+            st.info("No data available to display.")
