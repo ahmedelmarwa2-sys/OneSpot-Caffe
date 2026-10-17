@@ -202,14 +202,13 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # جلب بيانات السطر المختار
+            # جلب بيانات السطر المختار كـ Series صريحة ومباشرة
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            # تهيئة متغيرات تخزين واجهة التحكم لربط الأزرار الحقيقية
-            if "action_step" not in st.session_state:
-                st.session_state["action_step"] = None
+            # إعداد مساحة تخزين آمنة للعمليات التفاعلية لمنع التوقف الصامت للواجهة
+            if "active_action" not in st.session_state:
+                st.session_state["active_action"] = None
 
-            # إنشاء الأعمدة لعرض البيانات يساراً والأزرار الفعلية يميناً تماماً كالصورة
-            box_col_data, box_col_btn1, box_col_btn2 = st.columns([4, 1, 1])
+            # 1. عرض البيانات بداخل صندوق تنبيه متناسق
+            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
             
-            with box_col_data:
