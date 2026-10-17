@@ -28,7 +28,8 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns()
+    # تم إصلاح القوسين هنا وتحديد أبعاد الأعمدة بدقة [1, 2, 1] لمنع الـ TypeError
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
         try:
@@ -158,6 +159,7 @@ if check_password():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # تم ضبط استخدام المعاملات لتجنب التحذيرات المستقبلية
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
                 'Total Expense': x[x['Type'] == 'Expense']['Amount'].sum(),
@@ -207,18 +209,14 @@ if check_password():
             selected_id = st.selectbox("Select Transaction ID to Action:", options=available_ids)
             
             if selected_id:
-                # تصفية الداتا فريم والحصول على السجل المختار
+                # تصفية وجلب السجل
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
-                    # تعديل جوهري آمن: قراءة الصف الأول كقيم فردية صحيحة 100%
-                    row_data = filtered_df.iloc[0]
                     
-                    val_date = pd.to_datetime(row_data["Date"]).date()
-                    val_type = str(row_data["Type"])
-                    val_category = str(row_data["Category"])
-                    val_amount = float(row_data["Amount"])
-                    val_description = str(row_data["Description"])
-                    
-                    st.markdown("### 📝 Edit or Delete From Here (التعديل أو الحذف من هنا):")
+                    # استخدام .iloc[0] لسحب القيم الفردية بشكل سليم وقاطع لمنع أي أخطاء صامتة
+                    val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
+                    val_type = str(filtered_df["Type"].iloc[0])
+                    val_category = str(filtered_df["Category"].iloc[0])
+                    val_amount = float(filtered_df["Amount"].iloc[0])
