@@ -85,7 +85,6 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # دمج كافة الفئات للتأكد من خيارات التعديل بالجدول الذكي
     ALL_CATS = INCOME_CATS + EXPENSE_CATS
     
     # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
@@ -198,9 +197,8 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Edit or Delete Transactions Inline")
         if not df_all.empty:
-            st.write("💡 **نظام التعديل المباشر الذكي:** يمكنك تعديل أو تغيير أي خانة مباشرة من الجدول بالضغط عليها مرتين، كما يمكنك تحديد السطر واضغط على زر السلة لحذفه، ثم اضغط على زر الحفظ النهائي بالأسفل.")
+            st.write("💡 **نظام التعديل المباشر الذكي:** يمكنك تعديل أو تغيير أي خانة مباشرة من الجدول بالضغط عليها مرتين، كما يمكنك تحديد السطر واضغط على زر Delete في لوحة المفاتيح لحذفه، ثم اضغط على زر الحفظ النهائي بالأسفل.")
             
-            # محرر البيانات الذكي يمنع مشاكل تعارض الأقواس أو أخطاء الصياغة نهائياً
             edited_df = st.data_editor(
                 df_all,
                 column_config={
@@ -210,3 +208,6 @@ if check_password():
                     "Category": st.column_config.SelectboxColumn("Category", options=ALL_CATS, required=True),
                     "Amount": st.column_config.NumberColumn("Amount ($)", min_value=0.0, format="$%.2f", required=True),
                     "Date": st.column_config.TextColumn("Date", required=True),
+                    "Description": st.column_config.TextColumn("Description / Notes", required=True)
+                },
+                use_container_width=True,
