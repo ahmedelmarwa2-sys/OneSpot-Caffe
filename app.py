@@ -210,4 +210,5 @@ if check_password():
                     "Date": st.column_config.TextColumn("Date", required=True),
                     "Description": st.column_config.TextColumn("Description / Notes", required=True)
                 },
-                use_container_width=True,
+                            use_container_width=True,
+            )
