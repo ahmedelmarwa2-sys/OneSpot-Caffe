@@ -6,7 +6,7 @@ import os
 # 1. إعدادات الحماية والأمان بالباسورد
 def check_password():
     def password_entered():
-        if st.session_state["password"] == st.secrets.get("password", "onespot123"): # تمت إضافة كلمة مرور افتراضية للتجربة المحلية
+        if st.session_state["password"] == st.secrets.get("password", "onespot123"): 
             st.session_state["password_correct"] = True
             del st.session_state["password"]  
         else:
@@ -138,7 +138,7 @@ if check_password():
                 
     st.markdown("---")
     
-    # 4. عرض التقارير والجداول التفاعلية (الألسنة الثلاثة) خارج شروط الإدخال تماماً لتعمل دائماً
+    # 4. عرض التقارير والجداول التفاعلية (الألسنة الثلاثة)
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
@@ -212,11 +212,11 @@ if check_password():
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # تم إصلاح الأقواس المسحوبة بدقة لسحب القيم بطريقة صحيحة
+                    # تعديل الأسطر هنا بإضافة [0].iloc لجلب البيانات بشكل سليم ومنع توقف اللوحة عن العرض
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
                     val_description = str(filtered_df["Description"].iloc[0])
                     
-                    # تم إصلاح إغلاق وضبط النصوص الممتدة (triple-quoted string) لتفادي الـ SyntaxError
+                    # عرض بيانات الفاتورة المحددة للمستخدم مباشرة 
