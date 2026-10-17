@@ -85,34 +85,28 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # تهيئة مفاتيح الجلسة (Session State) بشكل سليم لعدم حدوث تعارض
-    if "type_radio" not in st.session_state:
-        st.session_state["type_radio"] = None
-
-    # دالة ذكية لتصفير الخانات تلقائياً بشكل آمن تماماً يمنع تكرار الـ Widgets
-    def reset_form_fields():
-        st.session_state["type_radio"] = None
-        if "income_select" in st.session_state: del st.session_state["income_select"]
-        if "expense_select" in st.session_state: del st.session_state["expense_select"]
-        st.session_state["tx_amount_key"] = 0.0
-        st.session_state["tx_description_key"] = ""
+    # استخدام مفتاح تحديث فريد لضمان تصفير النموذج بطريقة مستقرة ودون أخطاء widget تعارضية
+    if "form_version" not in st.session_state:
+        st.session_state["form_version"] = 0
 
     # 3. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
-    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
-    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
+    # ربط جميع المفاتيح بالـ form_version لضمان التصفير النظيف
+    v = st.session_state["form_version"]
+    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"tx_date_key_{v}")
+    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{v}")
     
     if tx_type == "Income":
-        tx_category = st.selectbox("Category البند:", INCOME_CATS, key="income_select")
+        tx_category = st.selectbox("Category البند:", INCOME_CATS, key=f"income_select_{v}")
     elif tx_type == "Expense":
-        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key="expense_select")
+        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key=f"expense_select_{v}")
     else:
         st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
         tx_category = None
         
-    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key="tx_amount_key")
-    tx_description = st.text_input("Description / Notes (البيان):", key="tx_description_key")
+    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key=f"tx_amount_key_{v}")
+    tx_description = st.text_input("Description / Notes (البيان):", key=f"tx_description_key_{v}")
     
     if st.button("💾 Save Transaction", type="primary"):
         if tx_type is None:
@@ -133,8 +127,8 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # تفعيل تصفير النموذج
-            reset_form_fields()
+            # رفع الـ version لتصفير الحقول بشكل رسمي ونظيف
+            st.session_state["form_version"] += 1
             st.success("✅ Successfully Recorded!")
             st.rerun()
             
@@ -211,13 +205,17 @@ if check_password():
                 use_container_width=True,
                 hide_index=True,
                 on_select="rerun",
-                selection_mode="single-row"
+                selection_mode="single-row",
+                key="edit_table_view"
             )
             
             # التقاط مصفوفة السطور المحددة
             selected_rows = event.get("selection", {}).get("rows", [])
             
             if len(selected_rows) > 0:
-                selected_row_idx = selected_rows[0] # جلب الرقم الأول الفعلي من داخل المصفوفة بدقة
+                selected_row_idx = selected_rows[0] # جلب الرقم الأول الفعلي بدقة من المصفوفة
                 selected_row = df_all.iloc[selected_row_idx]
+                
+                st.markdown("---")
+                st.markdown(f"### 🔄 Modifying Transaction [ ID: {selected_row['ID']} ]")
                 
