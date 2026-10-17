@@ -80,26 +80,33 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # --- جزء إدخال البيانات فائق السرعة والمحمي ضد التحديث الكامل للصفحة ---
+    # استخدام مفتاح تحديث فريد لتصفير النموذج بنجاح وبدون تداخل
+    if "form_version" not in st.session_state:
+        st.session_state["form_version"] = 0
+
+    # --- جزء إدخال البيانات فائق السرعة والمحمي مع ميزة التصفير التلقائي الفوري ---
     @st.fragment
     def transaction_form_fragment():
         st.subheader("📝 Record New Transaction")
         
-        tx_date = st.date_input("Transaction Date:", datetime.date.today())
-        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True)
+        # ربط الـ key بمتغير التحديث لضمان تصفير الخانات فوراً عند الحفظ
+        v = st.session_state["form_version"]
+        
+        tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"dt_{v}")
+        tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"tp_{v}")
         
         if tx_type == "Income":
-            tx_category = st.selectbox("Category البند:", INCOME_CATS)
+            tx_category = st.selectbox("Category البند:", INCOME_CATS, key=f"cat_in_{v}")
         elif tx_type == "Expense":
-            tx_category = st.selectbox("Category البند:", EXPENSE_CATS)
+            tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key=f"cat_ex_{v}")
         else:
             st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
             tx_category = None
             
-        tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f")
-        tx_description = st.text_input("Description / Notes (البيان):")
+        tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key=f"amt_{v}")
+        tx_description = st.text_input("Description / Notes (البيان):", key=f"desc_{v}")
         
-        if st.button("💾 Save Transaction", type="primary"):
+        if st.button("💾 Save Transaction", type="primary", key=f"btn_{v}"):
             if tx_type is None:
                 st.error("⚠️ Please select Transaction Type (Income or Expense)!")
             elif tx_amount == 0 or tx_description == "":
@@ -118,10 +125,13 @@ if check_password():
                 }])
                 df_all = pd.concat([df_all, new_row], ignore_index=True)
                 df_all.to_csv(DATA_FILE, index=False)
-                st.success("✅ Successfully Recorded!")
+                
+                # تحديث رقم الإصدار لتصفير كافة خانات النموذج فوراً بصمت وبسرعة
+                st.session_state["form_version"] += 1
+                st.success("✅ Successfully Recorded & Form Cleared!")
                 st.rerun()
 
-    # تشغيل نموذج الإدخال السريع
+    # تشغيل نموذج الإدخال السريع والمطور
     transaction_form_fragment()
     st.markdown("---")
     
@@ -195,14 +205,3 @@ if check_password():
                     id_parts = selected_to_delete.split("|")
                     target_id = int(id_parts[0].replace("ID:", "").strip())
                     
-                    if st.button("❌ تأكيد مسح القيد نهائياً", type="secondary", use_container_width=True):
-                        df_all = df_all[df_all['ID'] != target_id].reset_index(drop=True)
-                        if not df_all.empty:
-                            df_all["ID"] = range(1, len(df_all) + 1)
-                        df_all.to_csv(DATA_FILE, index=False)
-                        st.success(f"✅ تم مسح القيد رقم {target_id} بنجاح تحديث السجلات!")
-                        st.rerun()
-                        
-            delete_transaction_fragment()
-        else:
-            st.info("No data available to display.")
