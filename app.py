@@ -202,13 +202,17 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # [تم الإصلاح هنا] تحديد المؤشر المباشر .iloc[0] لسحب السجل بنجاح ومنع انهيار الكود صامتاً
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
+            # إعداد الحاوية العلوية المقسمة إلى جزئين (البيانات يساراً، والأزرار يميناً تماماً كالصورة المرفقة)
+            box_col_data, box_col_actions = st.columns([3, 1])
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("**Option A: Edit Selected Item**")
-                current_type = row_data["Type"]
+            with box_col_data:
+                st.info(f"""
+                📋 **Current Invoice Data (بيانات الفاتورة الحالية):**
+                * **Type:** {row_data['Type']} | **Category:** {row_data['Category']}
+                * **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}
+                * **Description:** {row_data['Description']}
+                """)
+                
+            with box_col_actions:
