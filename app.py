@@ -197,7 +197,6 @@ if check_password():
         if not df_all.empty:
             st.write("📌 **Select a row from the table below to Edit or Delete:**")
             
-            # عرض جدول التعديل التفاعلي مع تفعيل التحديد المباشر بنجاح وبدون تداخل
             event = st.dataframe(
                 df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
                 use_container_width=True,
@@ -207,12 +206,10 @@ if check_password():
                 key="edit_table_view"
             )
             
-            # التقاط السطر المختار
             selected_rows = event.get("selection", {}).get("rows", [])
             
             if len(selected_rows) > 0:
-                selected_row_idx = selected_rows[0]
-                # استخراج السطر المقابل للفهرس البصري بدقة
+                selected_row_idx = int(selected_rows[0])
                 selected_row = df_all.iloc[selected_row_idx]
                 target_id = int(selected_row['ID'])
                 
@@ -222,3 +219,6 @@ if check_password():
                 col_edit1, col_edit2, col_edit3 = st.columns(3)
                 
                 with col_edit1:
+                    edit_date = st.date_input(
+                        "Edit Date:", 
+                        value=pd.to_datetime(selected_row['Date']).date(),
