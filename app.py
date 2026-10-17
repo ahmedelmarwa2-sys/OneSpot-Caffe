@@ -195,16 +195,16 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Edit or Delete Transactions Panel")
         if not df_all.empty:
-            # تجهيز مصفوفة الاختيار بدون حدوث تعارض
+            # تجهيز الخيارات في القائمة المنسدلة بشكل نصي
             transaction_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
             selected_option = st.selectbox("🎯 اختر العملية التي تريد تعديلها أو حذفها:", ["-- اختر العملية --"] + transaction_options)
             
             if selected_option != "-- اختر العملية --":
-                # استخراج المعرف ID بشكل رياضي آمن
+                # استخراج المعرف الرقمي الصافي آلياً
                 id_part = selected_option.split("|")[0]
                 target_id = int(id_part.replace("ID:", "").strip())
                 
-                # جلب السطر المقابل للـ ID الفريد بشكل كامل وصحيح
+                # جلب السطر المقابل للـ ID
                 matched_rows = df_all[df_all['ID'] == target_id]
                 
                 if not matched_rows.empty:
