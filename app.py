@@ -14,11 +14,11 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.set_page_config(page_title="Login Required", page_icon="🔒", layout="wide")
-        st.title("🔒 Cafe System - Secure Login")
+        st.title("🔒 OneSpot Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        st.title("🔒 Cafe System - Secure Login")
+        st.title("🔒 OneSpot Cafe System - Secure Login")
         st.text_input("Enter Cafe Password:", type="password", on_change=password_entered, key="password")
         st.error("❌ Incorrect password. Please try again.")
         return False
@@ -28,23 +28,39 @@ def check_password():
 # تشغيل البرنامج بالكامل إذا كانت كلمة المرور صحيحة
 if check_password():
     
-    # ضبط المساحة النسبية المتناسقة للشعار والعنوان بشكل صحيح
-    col_logo, col_title = st.columns([1, 6])
+    # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
-    with col_logo:
+    with col_img:
         try:
-            st.image("logo.png", width=90)
+            st.image("banner.png", use_container_width=True)
         except:
-            st.write("☕")
-            
-    with col_title:
-        st.title("Onespot Cafe Financial Management System")
+            st.markdown(
+                """
+                <div style='background: #1a1a1a; padding: 15px; border-radius: 12px; text-align: center; border-bottom: 3px solid #d4af37;'>
+                    <h2 style='color: #ffffff; margin: 0; font-family: "Segoe UI", sans-serif;'>OneSpot Cafe</h2>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+    st.markdown(
+        """
+        <div style='text-align: center; margin-top: 5px; margin-bottom: 25px;'>
+            <p style='font-family: "Segoe UI", sans-serif; font-size: 20px; color: #7f8c8d; font-weight: 500; letter-spacing: 1px;'>
+                Financial Management System
+            </p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
     
     DATA_FILE = "cafe_data.csv"
     
     def load_data():
         if os.path.exists(DATA_FILE):
             df = pd.read_csv(DATA_FILE)
+            df = df.dropna(subset=["Category", "Amount", "Type"], how="any")
             if "ID" not in df.columns:
                 df.insert(0, "ID", range(1, len(df) + 1))
             df["ID"] = df["ID"].astype(int)
@@ -55,8 +71,19 @@ if check_password():
     df_all = load_data()
     st.markdown("---")
     
-    INCOME_CATS = ["Daily Sales", "Event Catering", "Other Income"]
-    EXPENSE_CATS = ["Coffee Beans & Milk", "Staff Salaries", "Rent & Utilities", "Maintenance", "Marketing", "Other Expense"]
+    # القوائم الثابتة لبنود الحسابات المدمجة الخاصة بـ OneSpot Cafe
+    INCOME_CATS = [
+        "Daily Sales (المبيعات اليوميه)", 
+        "Other Income (إيرادات أخرى)"
+    ]
+    EXPENSE_CATS = [
+        "Coffee Beans & Milk (مواد خام)", 
+        "Staff Salaries (رواتب الموظفين)", 
+        "Rent & Utilities (إيجار وفواتير)", 
+        "(valu installments) (اقساط فاليو)", 
+        "Packaging (أكواب ومطبوعات)",
+        "Other Expense (مصروفات أخرى)"
+    ]
     
     # دالة ذكية لتصفير الخانات تلقائياً عند الضغط على زر الحفظ بنجاح
     def reset_form_fields():
@@ -66,7 +93,7 @@ if check_password():
         st.session_state["tx_amount_key"] = 0.0
         st.session_state["tx_description_key"] = ""
 
-    # 2. نموذج الإدخال
+    # 3. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
     tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
@@ -80,7 +107,7 @@ if check_password():
         st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
         tx_category = None
         
-    tx_amount = st.number_input("Amount (\$):", min_value=0.0, step=10.0, format="%.2f", key="tx_amount_key")
+    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key="tx_amount_key")
     tx_description = st.text_input("Description / Notes (البيان):", key="tx_description_key")
     
     if st.button("💾 Save Transaction", type="primary"):
@@ -109,7 +136,7 @@ if check_password():
             
     st.markdown("---")
     
-    # 3. عرض التقارير والجداول المحدثة والتفاعلية
+    # 4. عرض التقارير والجداول المحدثة والتفاعلية (الألسنة الثلاثة)
     tab1, tab2, tab3 = st.tabs(["📊 Monthly Report Dashboard", "📅 Daily Transactions Log", "🛠️ Edit / Delete Actions"])
     
     with tab1:
@@ -117,6 +144,17 @@ if check_password():
         if not df_all.empty:
             df_all['Amount'] = pd.to_numeric(df_all['Amount'])
             df_all['Month_No'] = pd.to_numeric(df_all['Month_No'])
+            
+            total_income_all = df_all[df_all['Type'] == 'Income']['Amount'].sum()
+            total_expense_all = df_all[df_all['Type'] == 'Expense']['Amount'].sum()
+            net_profit_all = total_income_all - total_expense_all
+            
+            m_col1, m_col2, m_col3 = st.columns(3)
+            m_col1.metric(label="Total Income (إجمالي الإيرادات)", value=f"${total_income_all:,.2f}")
+            m_col2.metric(label="Total Expenses (إجمالي المصروفات)", value=f"${total_expense_all:,.2f}")
+            m_col3.metric(label="Net Profit (صافي الربح الكلي)", value=f"${net_profit_all:,.2f}", delta=f"${net_profit_all:,.2f}")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
             
             monthly_summary = df_all.groupby('Month_No').apply(lambda x: pd.Series({
                 'Total Income': x[x['Type'] == 'Income']['Amount'].sum(),
@@ -126,19 +164,37 @@ if check_password():
             
             months_names = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             monthly_summary['Month'] = monthly_summary['Month_No'].map(months_names)
-            st.dataframe(monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']], use_container_width=True, hide_index=True)
             
-            st.subheader("🔍 Expense Breakdown (تحليل بند المصروفات)")
-            df_expenses = df_all[df_all['Type'] == 'Expense']
-            if not df_expenses.empty:
-                expense_breakdown = df_expenses.groupby('Category')['Amount'].sum().reset_index()
-                st.dataframe(expense_breakdown.rename(columns={'Category': 'Expense Item', 'Amount': 'Total Spent (\$)'}), use_container_width=True, hide_index=True)
+            styled_summary = monthly_summary[['Month', 'Total Income', 'Total Expense', 'Net Profit']]
+            st.dataframe(
+                styled_summary.style.format({
+                    'Total Income': '${:,.2f}',
+                    'Total Expense': '${:,.2f}',
+                    'Net Profit': '${:,.2f}'
+                }).map(lambda val: 'color: #27ae60; font-weight: bold;' if val > 0 else 'color: #c0392b; font-weight: bold;', subset=['Net Profit']),
+                use_container_width=True, 
+                hide_index=True
+            )
+            
+            st.subheader("🔍 Breakdown (تحليل بنود الحسابات بالتاريخ)")
+            col_inc, col_exp = st.columns(2)
+            with col_inc:
+                st.write("**Income Analysis (إيرادات بالتاريخ)**")
+                df_inc = df_all[df_all['Type'] == 'Income']
+                st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
+            with col_exp:
+                st.write("**Expense Analysis (المصروفات بالتاريخ)**")
+                df_exp = df_all[df_all['Type'] == 'Expense']
+                st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
-            st.info("No data recorded yet.")
+            st.info("💡 No data available to display in dashboard.")
             
     with tab2:
-        st.subheader("All Records Saved")
-        st.dataframe(df_all, use_container_width=True, hide_index=True)
+        st.subheader("📅 All Historical Transactions Log")
+        if not df_all.empty:
+            st.dataframe(df_all[["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
+        else:
+            st.info("💡 No recorded transactions found.")
 
     with tab3:
         st.subheader("🛠️ Modify or Remove a Transaction")
@@ -146,10 +202,10 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # 🔥 الإصلاح النهائي والجذري: استخدام .iloc[0] بشكل صحيح لاستخراج السطر الفعلي كقيم فردية مستقرة
+            # جلب السطر الفعلي كقيم فردية مستقرة بناءً على الكود الشغال لديك
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            st.markdown(f"**Current Data:** Item: `{row_data['Category']}` | Type: `{row_data['Type']}` | Amount: `${row_data['Amount']}` | Note: `{row_data['Description']}`")
+            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
             
             col1, col2 = st.columns([1, 1])
             
@@ -157,32 +213,3 @@ if check_password():
                 st.write("**Option A: Edit Selected Item**")
                 current_type = row_data["Type"]
                 cat_options = INCOME_CATS if current_type == "Income" else EXPENSE_CATS
-                
-                try:
-                    default_idx = cat_options.index(row_data["Category"])
-                except ValueError:
-                    default_idx = 0
-                    
-                edit_cat = st.selectbox("New Category البند الجديد:", options=cat_options, index=default_idx, key=f"cat_edit_{selected_id}")
-                edit_amount = st.number_input("New Amount (\$):", value=float(row_data["Amount"]), key=f"amt_edit_{selected_id}")
-                edit_desc = st.text_input("New Description / Notes:", value=str(row_data["Description"]), key=f"dsc_edit_{selected_id}")
-                
-                if st.button("✏️ Save Changes", key=f"save_btn_{selected_id}"):
-                    df_all.loc[df_all["ID"] == int(selected_id), "Category"] = edit_cat
-                    df_all.loc[df_all["ID"] == int(selected_id), "Amount"] = edit_amount
-                    df_all.loc[df_all["ID"] == int(selected_id), "Description"] = edit_desc
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.success(f"Transaction ID {selected_id} updated successfully!")
-                    st.rerun()
-                    
-            with col2:
-                st.write("**Option B: Delete Selected Item**")
-                st.warning("⚠️ Warning: This action cannot be undone.")
-                
-                if st.button("🗑️ Delete Transaction", type="destructive", key=f"delete_btn_{selected_id}"):
-                    df_all = df_all[df_all["ID"] != int(selected_id)]
-                    df_all.to_csv(DATA_FILE, index=False)
-                    st.success(f"Transaction ID {selected_id} deleted successfully!")
-                    st.rerun()
-        else:
-            st.info("No data available to modify or delete.")
