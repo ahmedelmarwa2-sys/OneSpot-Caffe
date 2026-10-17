@@ -29,7 +29,8 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    col_space1, col_img, col_space2 = st.columns()
+    # تم تصحيح الخطأ هنا عبر تمرير قائمة التوزيع المعتمدة مسبقاً لمنع انهيار المنصة
+    col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
         try:
@@ -211,4 +212,3 @@ if check_password():
                 st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
                 
             with box_col_actions:
-                st.write(" ") # تم إصلاح الفراغ البرمجي لمنع الـ IndentationError
