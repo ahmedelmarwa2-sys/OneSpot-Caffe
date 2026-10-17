@@ -29,7 +29,6 @@ def check_password():
 if check_password():
     
     # 2. إعدادات البانر الرئيسي بمقاس وسط متناسق وأنيق ومحاذاة مضبوطة
-    # تم تصحيح الخطأ هنا عبر تمرير قائمة التوزيع المعتمدة مسبقاً لمنع انهيار المنصة
     col_space1, col_img, col_space2 = st.columns([1, 2, 1])
     
     with col_img:
@@ -203,12 +202,12 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
+            # جلب السطر المختار بأمان
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            # إعداد الحاوية العلوية المقسمة إلى جزئين (البيانات يساراً، والأزرار يميناً تماماً كالصورة المرفقة)
-            box_col_data, box_col_actions = st.columns(2)
+            # عرض بيانات الفاتورة المحددة للمطلب
+            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
             
-            with box_col_data:
-                st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
-                
-            with box_col_actions:
+            # وضع الأزرار بشكل مباشر في خطوة واحدة واضحة ومستقرة تماماً
+            action_choice = st.radio("إختر الإجراء المطلوب / Actions:", ["تعديل / Edit", "حذف / Remove"], index=0, key=f"act_choice_{selected_id}", horizontal=True)
+
