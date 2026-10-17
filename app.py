@@ -210,13 +210,13 @@ if check_password():
                 filtered_df = df_all[df_all["ID"] == selected_id]
                 
                 if not filtered_df.empty:
-                    row_idx = filtered_df.index
+                    # [الحل النهائي والجذري] تحويل السطر المستهدف إلى قاموس لضمان استخراج البيانات بدون أي تعليق لواجهة Streamlit نهائياً
+                    invoice_data = filtered_df.to_dict('records')[0]
                     
-                    # [تم الإصلاح الجذري هنا] إضافة [0] لقراءة العنصر الأول بشكل صحيح منعاً لتوقف كود Streamlit عن العرض
-                    val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
-                    val_type = str(filtered_df["Type"].iloc[0])
-                    val_category = str(filtered_df["Category"].iloc[0])
-                    val_amount = float(filtered_df["Amount"].iloc[0])
-                    val_description = str(filtered_df["Description"].iloc[0])
+                    val_date = pd.to_datetime(invoice_data["Date"]).date()
+                    val_type = str(invoice_data["Type"])
+                    val_category = str(invoice_data["Category"])
+                    val_amount = float(invoice_data["Amount"])
+                    val_description = str(invoice_data["Description"])
                     
                     # عرض بيانات الفاتورة المحددة للمستخدم مباشرة 
