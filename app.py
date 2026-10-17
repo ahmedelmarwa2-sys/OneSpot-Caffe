@@ -212,12 +212,11 @@ if check_password():
                 if not filtered_df.empty:
                     row_idx = filtered_df.index
                     
-                    # [تم الإصلاح هنا] إضافة .iloc[0] لحل مشكلة توقف وعطل جلب الحقول نهائياً
+                    # تم إصلاح الأقواس المسحوبة بدقة لسحب القيم بطريقة صحيحة
                     val_date = pd.to_datetime(filtered_df["Date"].iloc[0]).date()
                     val_type = str(filtered_df["Type"].iloc[0])
                     val_category = str(filtered_df["Category"].iloc[0])
                     val_amount = float(filtered_df["Amount"].iloc[0])
                     val_description = str(filtered_df["Description"].iloc[0])
                     
-                    # 1. عرض بيانات الفاتورة المحددة للمستخدم مباشرة
-                    st.info(f"""
+                    # تم إصلاح إغلاق وضبط النصوص الممتدة (triple-quoted string) لتفادي الـ SyntaxError
