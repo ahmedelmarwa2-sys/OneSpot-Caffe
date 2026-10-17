@@ -85,31 +85,36 @@ if check_password():
         "Other Expense (مصروفات أخرى)"
     ]
     
-    # [مفتاح التصفير الذكي والآمن والمضمون 100%] لمنع الـ WidgetAlreadyInstantiatedError
-    if "form_reset_counter" not in st.session_state:
-        st.session_state["form_reset_counter"] = 0
+    # تهيئة مفاتيح الجلسة (Session State) بشكل سليم لعدم حدوث تعارض
+    if "type_radio" not in st.session_state:
+        st.session_state["type_radio"] = None
+
+    # دالة ذكية لتصفير الخانات تلقائياً بشكل آمن تماماً يمنع تكرار الـ Widgets
+    def reset_form_fields():
+        st.session_state["type_radio"] = None
+        if "income_select" in st.session_state: del st.session_state["income_select"]
+        if "expense_select" in st.session_state: del st.session_state["expense_select"]
+        st.session_state["tx_amount_key"] = 0.0
+        st.session_state["tx_description_key"] = ""
 
     # 3. نموذج الإدخال
     st.subheader("📝 Record New Transaction")
     
-    # ربط كافة عناصر النموذج الحالي بالمفتاح الديناميكي لضمان تنظيف البيانات دفعة واحدة بعد الحفظ
-    reset_suffix = st.session_state["form_reset_counter"]
-    
-    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key=f"tx_date_key_{reset_suffix}")
-    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key=f"type_radio_{reset_suffix}")
+    tx_date = st.date_input("Transaction Date:", datetime.date.today(), key="tx_date_key")
+    tx_type = st.radio("Transaction Type:", ["Income", "Expense"], index=None, horizontal=True, key="type_radio")
     
     if tx_type == "Income":
-        tx_category = st.selectbox("Category البند:", INCOME_CATS, key=f"income_select_{reset_suffix}")
+        tx_category = st.selectbox("Category البند:", INCOME_CATS, key="income_select")
     elif tx_type == "Expense":
-        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key=f"expense_select_{reset_suffix}")
+        tx_category = st.selectbox("Category البند:", EXPENSE_CATS, key="expense_select")
     else:
         st.info("💡 Please select Transaction Type (Income / Expense) first to view categories.")
         tx_category = None
         
-    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key=f"tx_amount_key_{reset_suffix}")
-    tx_description = st.text_input("Description / Notes (البيان):", key=f"tx_description_key_{reset_suffix}")
+    tx_amount = st.number_input("Amount ($):", min_value=0.0, step=10.0, format="%.2f", key="tx_amount_key")
+    tx_description = st.text_input("Description / Notes (البيان):", key="tx_description_key")
     
-    if st.button("💾 Save Transaction", type="primary", key=f"save_main_btn_{reset_suffix}"):
+    if st.button("💾 Save Transaction", type="primary"):
         if tx_type is None:
             st.error("⚠️ Please select Transaction Type (Income or Expense)!")
         elif tx_amount == 0 or tx_description == "":
@@ -128,8 +133,8 @@ if check_password():
             df_all = pd.concat([df_all, new_row], ignore_index=True)
             df_all.to_csv(DATA_FILE, index=False)
             
-            # زيادة رقم العداد لتهيئة عناصر التحكم النظيفة وتصفير المدخلات تلقائياً
-            st.session_state["form_reset_counter"] += 1
+            # تفعيل تصفير النموذج
+            reset_form_fields()
             st.success("✅ Successfully Recorded!")
             st.rerun()
             
@@ -182,29 +187,35 @@ if check_password():
                 df_inc = df_all[df_all['Type'] == 'Income']
                 st.dataframe(df_inc[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
             with col_exp:
-                st.write("**Expense Analysis (المصروفات بالتاريخ)**")
+                st.write("**Expense Analysis (مصروفات بالتاريخ)**")
                 df_exp = df_all[df_all['Type'] == 'Expense']
                 st.dataframe(df_exp[['Date', 'Category', 'Amount', 'Description']], use_container_width=True, hide_index=True)
         else:
-            st.info("💡 No data available to display in dashboard.")
-            
+            st.info("No data available yet.")
+
     with tab2:
-        st.subheader("📅 All Historical Transactions Log")
+        st.subheader("📅 Daily Transactions Log")
         if not df_all.empty:
-            st.dataframe(df_all[["ID", "Date", "Month_No", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]], use_container_width=True, hide_index=True)
         else:
-            st.info("💡 No recorded transactions found.")
+            st.info("No data available to display.")
 
     with tab3:
-        st.subheader("🛠️ Modify or Remove a Transaction")
+        st.subheader("🛠️ Edit or Delete Transactions")
         if not df_all.empty:
-            id_list = df_all["ID"].tolist()
-            selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
+            st.write("📌 **Select a row from the table below to Edit or Delete:**")
             
-            # جلب بيانات السطر المختار كـ Series صريحة ومباشرة
-            row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
+            # عرض جدول المسح والتعديل التفاعلي الآمن
+            event = st.dataframe(
+                df_all[["ID", "Date", "Category", "Type", "Amount", "Description"]],
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
+            )
             
-            if "active_action" not in st.session_state:
-                st.session_state["active_action"] = None
-
-            # 1. عرض البيانات بداخل صندوق تنبيه متناسق ومميز
+            if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
+                selected_row_idx = event.selection["rows"][0] # التقاط الفهرس الفعلي بدقة
+                selected_row = df_all.iloc[selected_row_idx]
+                
+                st.markdown("---")
