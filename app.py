@@ -195,13 +195,16 @@ if check_password():
     with tab3:
         st.subheader("🛠️ Edit or Delete Transactions Panel")
         if not df_all.empty:
-            # 1. قائمة اختيار منسدلة فريدة تعتمد على معرفات المعاملة للتحكم المطلق
-            transaction_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | {r['Amount']} | {r['Description'][:20]}...", axis=1).tolist()
+            # قائمة فريدة مجهزة للقراءة
+            transaction_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | {r['Amount']} | {str(r['Description'])[:20]}...", axis=1).tolist()
             selected_option = st.selectbox("🎯 اختر العملية التي تريد تعديلها أو حذفها:", ["-- اختر العملية --"] + transaction_options)
             
             if selected_option != "-- اختر العملية --":
-                # استخراج المعرف الفريد للعملية المحددة بدقة
-                target_id = int(selected_option.split("|")[0].replace("ID:", "").strip())
+                # إصلاح طريقة سحب الـ ID وتجنب التعليق بصمت
+                raw_id_part = selected_option.split("|")[0]
+                target_id = int(raw_id_part.replace("ID:", "").strip())
+                
+                # استخراج السطر المختار بدقة كـ Series
                 selected_row = df_all[df_all['ID'] == target_id].iloc[0]
                 
                 st.markdown("---")
@@ -212,6 +215,4 @@ if check_password():
                 with col_edit1:
                     edit_date = st.date_input(
                         "تعديل التاريخ:", 
-                        value=pd.to_datetime(selected_row['Date']).date(),
-                        key=f"e_dt_{target_id}"
-                    )
+                                  )
