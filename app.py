@@ -202,12 +202,14 @@ if check_password():
             id_list = df_all["ID"].tolist()
             selected_id = st.selectbox("Select Transaction ID to Action:", id_list, key="select_id_action")
             
-            # جلب السطر المختار بأمان
+            # جلب بيانات السطر المختار
             row_data = df_all[df_all["ID"] == int(selected_id)].iloc[0]
             
-            # عرض بيانات الفاتورة المحددة للمطلب
-            st.info(f"📋 **Current Invoice Data (بيانات الفاتورة الحالية):**\n\n* **Type:** {row_data['Type']} | **Category:** {row_data['Category']}\n* **Date:** {row_data['Date']} | **Amount:** ${float(row_data['Amount']):,.2f}\n* **Description:** {row_data['Description']}")
-            
-            # وضع الأزرار بشكل مباشر في خطوة واحدة واضحة ومستقرة تماماً
-            action_choice = st.radio("إختر الإجراء المطلوب / Actions:", ["تعديل / Edit", "حذف / Remove"], index=0, key=f"act_choice_{selected_id}", horizontal=True)
+            # تهيئة متغيرات تخزين واجهة التحكم لربط الأزرار الحقيقية
+            if "action_step" not in st.session_state:
+                st.session_state["action_step"] = None
 
+            # إنشاء الأعمدة لعرض البيانات يساراً والأزرار الفعلية يميناً تماماً كالصورة
+            box_col_data, box_col_btn1, box_col_btn2 = st.columns([4, 1, 1])
+            
+            with box_col_data:
