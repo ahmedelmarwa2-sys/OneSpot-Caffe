@@ -193,6 +193,7 @@ if check_password():
         else:
             st.info("No data available to display.")
 
+    
     with tab3:
         st.subheader("🗑️ Delete a Transaction (مصدر مسح القيود)")
         if not df_all.empty:
@@ -200,8 +201,27 @@ if check_password():
             @st.fragment
             def delete_transaction_tab_fragment():
                 global df_all
-                delete_options = df_all.apply(lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:30]}...", axis=1).tolist()
-                selected_to_delete = st.selectbox("🎯 اختر القيد الذي تريد مسحه نهائياً من الحسابات:", ["-- اختر القيد --"] + delete_options, key="tab_del_select")
-                
+
+                delete_options = df_all.apply(
+                    lambda r: f"ID: {r['ID']} | {r['Date']} | {r['Type']} | ${r['Amount']} | {str(r['Description'])[:30]}...",
+                    axis=1
+                ).tolist()
+
+                selected_to_delete = st.selectbox(
+                    "🎯 اختر القيد الذي تريد مسحه نهائياً من الحسابات:",
+                    ["-- اختر القيد --"] + delete_options,
+                    key="tab_del_select"
+                )
+
                 if selected_to_delete != "-- اختر القيد --":
-                    # إصلاح طريقة سحب الـ ID بتحديد العنصر الأول [0] من مصفوفة الانقسام
+                    # استخراج الـ ID من أول جزء في النص المختار
+                    selected_id = selected_to_delete.split("|")[0].replace("ID:", "").strip()
+
+                    st.write(f"القيد المختار للحذف: {selected_id}")
+
+                    if st.button("🗑️ تأكيد حذف القيد", key="confirm_delete_transaction"):
+                        st.warning("أضف هنا كود الحذف الفعلي وحفظ البيانات بعد التأكد من طريقة تخزين معاملاتك.")
+
+            delete_transaction_tab_fragment()
+        else:
+            st.info("لا توجد قيود متاحة للحذف.")
