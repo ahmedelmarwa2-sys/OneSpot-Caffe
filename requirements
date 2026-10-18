@@ -2,6 +2,6 @@ streamlit
 pandas
 plotly
 openpyxl
-SQLAlchemy
+sqlalchemy
 psycopg2-binary
-SQLAlchemy
+
