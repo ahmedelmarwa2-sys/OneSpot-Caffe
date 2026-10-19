@@ -522,10 +522,24 @@ def load_transaction_audit(limit=200):
   return pd.read_csv(AUDIT_FILE).tail(limit).iloc[::-1].reset_index(drop=True)
 
 
+def attendance_day_mask(frame):
+  """Count a day when hours exist or either attendance punch is recorded."""
+  hours = pd.to_numeric(
+      frame.get("ساعات العمل", pd.Series(0, index=frame.index)), errors="coerce"
+  ).fillna(0)
+  has_hours = hours > 0
+  has_punch = pd.Series(False, index=frame.index)
+  for column in ("الحضور", "الانصراف"):
+    if column in frame:
+      values = frame[column].fillna("").astype(str).str.strip().str.lower()
+      has_punch |= ~values.isin(["", "nan", "none", "nat"])
+  return has_hours | has_punch
+
+
 def save_employee_attendance(attendance_df):
-  """Persist only new employee/date rows; never overwrite an existing record."""
+  """Keep one row per employee/date and refresh it when the uploaded details changed."""
   if attendance_df is None or attendance_df.empty:
-    return 0
+    return {"inserted": 0, "updated": 0, "unchanged": 0}
   engine = get_database_engine()
   if engine is None:
     raise RuntimeError("Neon غير متصل؛ لم يتم حفظ بيانات متابعة الموظفين.")
@@ -559,9 +573,13 @@ def save_employee_attendance(attendance_df):
         "team": text_value(row.get("الفريق")) or "OneSpot",
     })
 
-  inserted = 0
+  inserted = updated = unchanged = 0
   with engine.begin() as connection:
     for record in records:
+      existed = connection.execute(text("""
+        SELECT 1 FROM employee_attendance
+        WHERE employee_name = :employee_name AND attendance_date = :attendance_date
+      """), record).scalar_one_or_none() is not None
       result = connection.execute(text("""
         INSERT INTO employee_attendance
           (employee_name, attendance_date, day_name, check_in, check_out,
@@ -569,11 +587,28 @@ def save_employee_attendance(attendance_df):
         VALUES
           (:employee_name, :attendance_date, :day_name, :check_in, :check_out,
            :work_hours, :salary_advance, :team)
-        ON CONFLICT (employee_name, attendance_date) DO NOTHING
+        ON CONFLICT (employee_name, attendance_date) DO UPDATE SET
+          day_name = EXCLUDED.day_name,
+          check_in = EXCLUDED.check_in,
+          check_out = EXCLUDED.check_out,
+          work_hours = EXCLUDED.work_hours,
+          salary_advance = EXCLUDED.salary_advance,
+          team = EXCLUDED.team
+        WHERE (employee_attendance.day_name, employee_attendance.check_in,
+               employee_attendance.check_out, employee_attendance.work_hours,
+               employee_attendance.salary_advance, employee_attendance.team)
+          IS DISTINCT FROM
+              (EXCLUDED.day_name, EXCLUDED.check_in, EXCLUDED.check_out,
+               EXCLUDED.work_hours, EXCLUDED.salary_advance, EXCLUDED.team)
       """), record)
       if result.rowcount and result.rowcount > 0:
-        inserted += result.rowcount
-  return inserted
+        if existed:
+          updated += 1
+        else:
+          inserted += 1
+      else:
+        unchanged += 1
+  return {"inserted": inserted, "updated": updated, "unchanged": unchanged}
 
 
 def load_employee_attendance():
@@ -624,13 +659,12 @@ def process_attendance_upload(attendance_rows, uploaded_file, ignored_sheets):
   upload_signature = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
   if st.session_state.get("attendance_saved_upload_signature") != upload_signature:
     try:
-      inserted_count = save_employee_attendance(attendance_df)
-      skipped_existing = len(attendance_df) - inserted_count
+      saved = save_employee_attendance(attendance_df)
       st.session_state["attendance_saved_upload_signature"] = upload_signature
       st.session_state["attendance_upload_result"] = {
           "signature": upload_signature,
-          "inserted": inserted_count,
-          "skipped": duplicates_in_file + skipped_existing,
+          **saved,
+          "skipped": duplicates_in_file + saved["unchanged"],
           "error": None,
       }
     except Exception as exc:
@@ -645,10 +679,13 @@ def process_attendance_upload(attendance_rows, uploaded_file, ignored_sheets):
   if result.get("signature") == upload_signature:
     if result.get("error"):
       st.error(f"تعذر حفظ السجلات الجديدة في متابعة الموظفين: {result['error']}")
-    elif result.get("inserted", 0):
-      st.success(f"تم حفظ {result['inserted']} سجل جديد في متابعة الموظفين.")
+    elif result.get("inserted", 0) or result.get("updated", 0):
+      st.success(
+          f"تمت إضافة {result.get('inserted', 0)} سجل جديد وتحديث "
+          f"{result.get('updated', 0)} سجل موجود في متابعة الموظفين."
+      )
     else:
-      st.info("لا توجد سجلات جديدة للحفظ؛ التواريخ الموجودة لم تتكرر.")
+      st.info("لا توجد تغييرات جديدة؛ بيانات التواريخ الموجودة مطابقة للملف.")
     if result.get("skipped", 0):
       st.caption(f"تم تخطي {result['skipped']} سجل مكرر، والاحتفاظ بسجل واحد لكل موظف في اليوم.")
   if ignored_sheets:
@@ -1899,7 +1936,10 @@ with tab_attendance:
                     )
                 else:
                     upload_status.update(
-                        label=f"اكتمل تحميل الملف — أُضيف {upload_result.get('inserted', 0)} سجل جديد",
+                        label=(
+                            f"اكتمل تحميل الملف — أُضيف {upload_result.get('inserted', 0)} "
+                            f"وتُحدّث {upload_result.get('updated', 0)} سجل"
+                        ),
                         state="complete",
                         expanded=False,
                     )
@@ -1927,7 +1967,8 @@ with tab_attendance:
         total_hours = attendance_view["ساعات العمل"].sum()
         total_advances = attendance_view["السلفة (ج.م)"].sum()
         employees_count = attendance_view["الموظف"].nunique()
-        worked_days = int((attendance_view["ساعات العمل"] > 0).sum())
+        attendance_view["يوم حضور"] = attendance_day_mask(attendance_view)
+        worked_days = int(attendance_view["يوم حضور"].sum())
         metric_cols = st.columns(4)
         metric_cols[0].metric("عدد الموظفين", f"{employees_count}")
         metric_cols[1].metric("إجمالي ساعات العمل", f"{total_hours:,.2f} ساعة")
@@ -1939,7 +1980,7 @@ with tab_attendance:
         monthly_employee_summary = attendance_view.groupby(
             ["الموظف", "الشهر المحسوب"], as_index=False
         ).agg(
-            **{"أيام العمل": ("ساعات العمل", lambda values: int((values > 0).sum())),
+            **{"أيام العمل": ("يوم حضور", "sum"),
                "إجمالي الساعات": ("ساعات العمل", "sum"),
                "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
         )
@@ -1999,7 +2040,8 @@ with tab_employee_tracking:
     st.subheader("متابعة الموظفين — OneSpot")
     st.caption(
         "كل ما ترفعه في تبويب الحضور والانصراف يظهر هنا محفوظًا في Neon. "
-        "يتم الاحتفاظ بسجل واحد لكل موظف في كل تاريخ؛ السجلات الجديدة فقط تُضاف."
+        "يتم الاحتفاظ بسجل واحد لكل موظف في كل تاريخ؛ السجلات الجديدة تُضاف "
+        "والتغييرات على تاريخ موجود تُحدّث السجل نفسه."
     )
     try:
         tracking_df = load_employee_attendance()
@@ -2029,7 +2071,8 @@ with tab_employee_tracking:
         total_tracking_hours = tracking_view["ساعات العمل"].sum()
         total_tracking_advances = tracking_view["السلفة (ج.م)"].sum()
         tracking_employee_count = tracking_view["الموظف"].nunique()
-        tracking_worked_days = int((tracking_view["ساعات العمل"] > 0).sum())
+        tracking_view["يوم حضور"] = attendance_day_mask(tracking_view)
+        tracking_worked_days = int(tracking_view["يوم حضور"].sum())
         tracking_metrics = st.columns(4)
         tracking_metrics[0].metric("عدد الموظفين", f"{tracking_employee_count}")
         tracking_metrics[1].metric("إجمالي ساعات العمل", f"{total_tracking_hours:,.2f} ساعة")
@@ -2041,7 +2084,7 @@ with tab_employee_tracking:
         monthly_tracking_summary = tracking_view.groupby(
             ["الموظف", "الشهر المحسوب"], as_index=False
         ).agg(
-            **{"أيام العمل": ("ساعات العمل", lambda values: int((values > 0).sum())),
+            **{"أيام العمل": ("يوم حضور", "sum"),
                "إجمالي الساعات": ("ساعات العمل", "sum"),
                "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
         )
