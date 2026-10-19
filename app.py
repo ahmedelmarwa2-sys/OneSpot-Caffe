@@ -2124,7 +2124,7 @@ with tab_employee_tracking:
                 border-radius:8px !important; min-height:42px !important;
               }
               .st-key-employee_report_design [data-testid="stMetric"] {
-                background:#ffffff !important; border:1px solid #e7ddd2 !important;
+                background:#fffdfa !important; border:1px solid #e7ddd2 !important;
                 border-radius:11px !important; padding:12px 14px !important; box-shadow:none !important;
               }
               .st-key-employee_report_design [data-testid="stMetricLabel"] {
@@ -2225,10 +2225,10 @@ with tab_employee_tracking:
                 )
             report_table_html = """
             <style>
-              .onespot-monthly-report { direction:rtl; width:100%; overflow-x:auto; border:1px solid #e7ddd2; border-radius:10px; background:#fff; }
-              .onespot-monthly-report table { width:100%; border-collapse:collapse; font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:12px; color:#2d2924; }
-              .onespot-monthly-report th { padding:11px 12px; text-align:right; white-space:nowrap; background:#f7f8fa; color:#74665b; font-size:11px; font-weight:500; border-bottom:1px solid #e7ddd2; }
-              .onespot-monthly-report td { padding:10px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #eee9e3; }
+              .onespot-monthly-report { direction:ltr; width:100%; overflow-x:auto; border:1px solid #e7ddd2; border-radius:10px; background:#fffdfa; }
+              .onespot-monthly-report table { direction:ltr; width:100%; border-collapse:collapse; font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:12px; color:#2d2924; background:#fffdfa; }
+              .onespot-monthly-report th { padding:11px 12px; text-align:left; white-space:nowrap; background:#f7f8fa; color:#74665b; font-size:11px; font-weight:500; border-bottom:1px solid #e7ddd2; }
+              .onespot-monthly-report td { padding:10px 12px; text-align:left; white-space:nowrap; border-bottom:1px solid #eee9e3; background:#fffdfa; }
               .onespot-monthly-report tbody tr:last-child td { border-bottom:0; }
               .onespot-monthly-report tbody tr:hover { background:#fbf8f4; }
               @media (max-width:700px) { .onespot-monthly-report table { min-width:760px; } }
