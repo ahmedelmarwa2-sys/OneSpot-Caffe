@@ -2362,10 +2362,12 @@ with tab_employee_tracking:
             tracking_display = tracking_view.copy()
             tracking_display["التاريخ"] = tracking_display["التاريخ"].dt.strftime("%Y-%m-%d")
             saved_display = tracking_display[[
-                "الموظف", "التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف",
+                "الموظف", "التاريخ", "اليوم", "الحضور", "الانصراف",
                 "ساعات العمل", "السلفة (ج.م)", "الفريق",
             ]].copy()
-            saved_display["الحالة"] = tracking_view.apply(attendance_status_for_row, axis=1).values
+            saved_display.insert(
+                3, "الحالة", tracking_view.apply(attendance_status_for_row, axis=1).values
+            )
             for numeric_column in ["ساعات العمل", "السلفة (ج.م)"]:
                 saved_display[numeric_column] = saved_display[numeric_column].map(
                     lambda value: f"{float(value):,.2f}"
