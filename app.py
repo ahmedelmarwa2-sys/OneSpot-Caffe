@@ -7,6 +7,7 @@ import tempfile
 import re
 import zipfile
 import hashlib
+import html
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from pathlib import Path
@@ -2105,70 +2106,6 @@ with tab_employee_tracking:
         tracking_months = sorted(
             tracking_df["التاريخ"].dt.strftime("%Y-%m").dropna().unique(), reverse=True
         )
-        selected_tracking_month = st.selectbox(
-            "الشهر:", ["كل الشهور"] + tracking_months,
-            key="employee_tracking_month_filter",
-        )
-        tracking_view = tracking_df.copy()
-        if selected_tracking_month != "كل الشهور":
-            tracking_view = tracking_view[
-                tracking_view["التاريخ"].dt.strftime("%Y-%m") == selected_tracking_month
-            ]
-
-        total_tracking_hours = tracking_view["ساعات العمل"].sum()
-        total_tracking_advances = tracking_view["السلفة (ج.م)"].sum()
-        tracking_employee_count = tracking_view["الموظف"].nunique()
-        tracking_view["يوم حضور"] = attendance_day_mask(tracking_view)
-        tracking_worked_days = int(tracking_view["يوم حضور"].sum())
-        tracking_metrics = st.columns(4)
-        tracking_metrics[0].metric("عدد الموظفين", f"{tracking_employee_count}")
-        tracking_metrics[1].metric("إجمالي ساعات العمل", f"{total_tracking_hours:,.2f} ساعة")
-        tracking_metrics[2].metric("أيام العمل المسجلة", f"{tracking_worked_days}")
-        tracking_metrics[3].metric("إجمالي السلف", format_currency(total_tracking_advances))
-
-        tracking_view = tracking_view.copy()
-        tracking_view["الشهر المحسوب"] = tracking_view["التاريخ"].dt.strftime("%Y-%m")
-        monthly_tracking_summary = tracking_view.groupby(
-            ["الموظف", "الشهر المحسوب"], as_index=False
-        ).agg(
-            **{"أيام العمل": ("يوم حضور", "sum"),
-               "إجمالي الساعات": ("ساعات العمل", "sum"),
-               "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
-        )
-        tracking_summary = monthly_tracking_summary.groupby("الموظف", as_index=False).agg(
-            **{"عدد الشهور": ("الشهر المحسوب", "nunique"),
-               "أيام العمل": ("أيام العمل", "sum"),
-               "إجمالي الساعات": ("إجمالي الساعات", "sum"),
-               "إجمالي السلف (ج.م)": ("إجمالي السلف (ج.م)", "sum")}
-        )
-        tracking_summary["الساعات المستهدفة"] = (
-            tracking_summary["عدد الشهور"] * monthly_hours_target
-        )
-        tracking_summary["الفرق عن المستهدف"] = (
-            tracking_summary["إجمالي الساعات"] - tracking_summary["الساعات المستهدفة"]
-        )
-        tracking_summary["الحالة"] = tracking_summary["الفرق عن المستهدف"].apply(
-            lambda difference: "مكتمل" if abs(difference) < 0.01
-            else ("أعلى من المستهدف" if difference > 0 else "أقل من المستهدف")
-        )
-        tracking_summary = tracking_summary[
-            ["الموظف", "عدد الشهور", "أيام العمل", "إجمالي الساعات",
-             "الساعات المستهدفة", "الفرق عن المستهدف", "الحالة", "إجمالي السلف (ج.م)"]
-        ]
-        st.markdown("#### ملخص الموظفين")
-        st.caption("المستهدف 234 ساعة لكل موظف عن كل شهر ظاهر في السجلات.")
-        st.dataframe(
-            tracking_summary.style.format({
-                "عدد الشهور": "{:,.0f}",
-                "أيام العمل": "{:,.0f}",
-                "إجمالي الساعات": "{:,.2f}",
-                "الساعات المستهدفة": "{:,.2f}",
-                "الفرق عن المستهدف": "{:+,.2f}",
-                "إجمالي السلف (ج.م)": "{:,.2f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
         st.markdown("#### 👤 التقرير الشهري للموظف")
         st.caption("اختار الموظف والشهر لعرض تفاصيل الحضور والإجازات يومًا بيوم.")
         report_cols = st.columns(2)
@@ -2232,26 +2169,51 @@ with tab_employee_tracking:
             "ساعات العمل", "السلفة (ج.م)",
         ]].copy()
         report_display["التاريخ"] = report_display["التاريخ"].dt.strftime("%Y-%m-%d")
-        def report_status_style(statuses):
-            styles = []
-            for status in statuses:
-                if "OFF" in str(status).upper():
-                    styles.append("background-color: #f6eddc; color: #8b612e; font-weight: 600")
-                elif "حضور" in str(status):
-                    styles.append("background-color: #e7f1ea; color: #367454; font-weight: 600")
-                else:
-                    styles.append("background-color: #f6e9e6; color: #a84f45; font-weight: 600")
-            return styles
+        def safe_report_value(value):
+            if value is None or pd.isna(value) or str(value).strip().lower() in {"none", "nan", "nat"}:
+                return "—"
+            return html.escape(str(value))
 
-        styled_report = report_display.style.format({
-                "ساعات العمل": "{:,.2f}",
-                "السلفة (ج.م)": "{:,.2f}",
-            }).apply(report_status_style, subset=["الحالة"])
-        st.dataframe(
-            styled_report,
-            use_container_width=True,
-            hide_index=True,
-        )
+        report_table_rows = []
+        for record in report_display.to_dict("records"):
+            status = str(record["الحالة"])
+            if "OFF" in status.upper():
+                badge_style = "background:#f6eddc;color:#8b612e;"
+            elif "حضور" in status:
+                badge_style = "background:#e7f1ea;color:#367454;"
+            else:
+                badge_style = "background:#f6e9e6;color:#a84f45;"
+            report_table_rows.append(
+                "<tr>"
+                f"<td>{safe_report_value(record['التاريخ'])}</td>"
+                f"<td>{safe_report_value(record['اليوم'])}</td>"
+                f"<td><span style='display:inline-block;border-radius:999px;padding:5px 11px;"
+                f"font-size:12px;font-weight:600;white-space:nowrap;{badge_style}'>"
+                f"{safe_report_value(status)}</span></td>"
+                f"<td>{safe_report_value(record['الحضور'])}</td>"
+                f"<td>{safe_report_value(record['الانصراف'])}</td>"
+                f"<td>{float(record['ساعات العمل'] or 0):,.2f}</td>"
+                f"<td>{float(record['السلفة (ج.م)'] or 0):,.2f}</td>"
+                "</tr>"
+            )
+        report_table_html = """
+        <style>
+          .onespot-monthly-report { direction:rtl; width:100%; overflow-x:auto; border:1px solid #e7ddd2; border-radius:10px; background:#fff; }
+          .onespot-monthly-report table { width:100%; border-collapse:collapse; font-family:Arial,"Segoe UI",sans-serif; font-size:13px; color:#2d2924; }
+          .onespot-monthly-report th { padding:11px 12px; text-align:right; white-space:nowrap; background:#f7f8fa; color:#74665b; font-weight:500; border-bottom:1px solid #e7ddd2; }
+          .onespot-monthly-report td { padding:10px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #eee9e3; }
+          .onespot-monthly-report tbody tr:last-child td { border-bottom:0; }
+          .onespot-monthly-report tbody tr:hover { background:#fbf8f4; }
+          @media (max-width:700px) { .onespot-monthly-report table { min-width:760px; } }
+        </style>
+        <div class="onespot-monthly-report"><table>
+          <thead><tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th><th>السلفة (ج.م)</th></tr></thead>
+          <tbody>
+        """ + "".join(report_table_rows) + """
+          </tbody>
+        </table></div>
+        """
+        st.markdown(report_table_html, unsafe_allow_html=True)
         st.download_button(
             "تنزيل تقرير الموظف لهذا الشهر",
             data=report_display.to_csv(index=False).encode("utf-8-sig"),
@@ -2261,6 +2223,73 @@ with tab_employee_tracking:
             mime="text/csv",
             key="employee_monthly_report_download",
         )
+
+        with st.expander("الملخص العام لكل الموظفين", expanded=False):
+            selected_tracking_month = st.selectbox(
+                "الشهر:", ["كل الشهور"] + tracking_months,
+                key="employee_tracking_month_filter",
+            )
+            tracking_view = tracking_df.copy()
+            if selected_tracking_month != "كل الشهور":
+                tracking_view = tracking_view[
+                    tracking_view["التاريخ"].dt.strftime("%Y-%m") == selected_tracking_month
+                ]
+
+            total_tracking_hours = tracking_view["ساعات العمل"].sum()
+            total_tracking_advances = tracking_view["السلفة (ج.م)"].sum()
+            tracking_employee_count = tracking_view["الموظف"].nunique()
+            tracking_view["يوم حضور"] = attendance_day_mask(tracking_view)
+            tracking_worked_days = int(tracking_view["يوم حضور"].sum())
+            tracking_metrics = st.columns(4)
+            tracking_metrics[0].metric("عدد الموظفين", f"{tracking_employee_count}")
+            tracking_metrics[1].metric("إجمالي ساعات العمل", f"{total_tracking_hours:,.2f} ساعة")
+            tracking_metrics[2].metric("أيام العمل المسجلة", f"{tracking_worked_days}")
+            tracking_metrics[3].metric("إجمالي السلف", format_currency(total_tracking_advances))
+
+            tracking_view = tracking_view.copy()
+            tracking_view["الشهر المحسوب"] = tracking_view["التاريخ"].dt.strftime("%Y-%m")
+            monthly_tracking_summary = tracking_view.groupby(
+                ["الموظف", "الشهر المحسوب"], as_index=False
+            ).agg(
+                **{"أيام العمل": ("يوم حضور", "sum"),
+                   "إجمالي الساعات": ("ساعات العمل", "sum"),
+                   "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
+            )
+            tracking_summary = monthly_tracking_summary.groupby("الموظف", as_index=False).agg(
+                **{"عدد الشهور": ("الشهر المحسوب", "nunique"),
+                   "أيام العمل": ("أيام العمل", "sum"),
+                   "إجمالي الساعات": ("إجمالي الساعات", "sum"),
+                   "إجمالي السلف (ج.م)": ("إجمالي السلف (ج.م)", "sum")}
+            )
+            tracking_summary["الساعات المستهدفة"] = (
+                tracking_summary["عدد الشهور"] * monthly_hours_target
+            )
+            tracking_summary["الفرق عن المستهدف"] = (
+                tracking_summary["إجمالي الساعات"] - tracking_summary["الساعات المستهدفة"]
+            )
+            tracking_summary["الحالة"] = tracking_summary["الفرق عن المستهدف"].apply(
+                lambda difference: "مكتمل" if abs(difference) < 0.01
+                else ("أعلى من المستهدف" if difference > 0 else "أقل من المستهدف")
+            )
+            tracking_summary = tracking_summary[
+                ["الموظف", "عدد الشهور", "أيام العمل", "إجمالي الساعات",
+                 "الساعات المستهدفة", "الفرق عن المستهدف", "الحالة", "إجمالي السلف (ج.م)"]
+            ]
+            st.markdown("#### ملخص الموظفين")
+            st.caption("المستهدف 234 ساعة لكل موظف عن كل شهر ظاهر في السجلات.")
+            st.dataframe(
+                tracking_summary.style.format({
+                    "عدد الشهور": "{:,.0f}",
+                    "أيام العمل": "{:,.0f}",
+                    "إجمالي الساعات": "{:,.2f}",
+                    "الساعات المستهدفة": "{:,.2f}",
+                    "الفرق عن المستهدف": "{:+,.2f}",
+                    "إجمالي السلف (ج.م)": "{:,.2f}",
+                }),
+                use_container_width=True,
+                hide_index=True,
+            )
+
         with st.expander("عرض جميع السجلات المحفوظة", expanded=False):
             tracking_display = tracking_view.copy()
             tracking_display["التاريخ"] = tracking_display["التاريخ"].dt.strftime("%Y-%m-%d")
