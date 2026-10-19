@@ -2169,7 +2169,8 @@ with tab_employee_tracking:
             use_container_width=True,
             hide_index=True,
         )
-        st.markdown("#### التقرير الشهري للموظف")
+        st.markdown("#### 👤 التقرير الشهري للموظف")
+        st.caption("اختار الموظف والشهر لعرض تفاصيل الحضور والإجازات يومًا بيوم.")
         report_cols = st.columns(2)
         report_employees = sorted(
             tracking_df["الموظف"].dropna().astype(str).str.strip().unique().tolist(),
@@ -2203,10 +2204,11 @@ with tab_employee_tracking:
             0: "الاثنين", 1: "الثلاثاء", 2: "الأربعاء", 3: "الخميس",
             4: "الجمعة", 5: "السبت", 6: "الأحد",
         }
-        report_rows["اليوم"] = report_rows.apply(
-            lambda row: row["اليوم"] if pd.notna(row.get("اليوم"))
-            else weekday_ar[row["التاريخ"].weekday()], axis=1
-        )
+        report_off_days = attendance_off_mask(report_rows)
+        report_rows["اليوم"] = [
+            "OFF" if is_off else weekday_ar[day.weekday()]
+            for day, is_off in zip(report_rows["التاريخ"], report_off_days)
+        ]
         report_rows["ساعات العمل"] = pd.to_numeric(
             report_rows["ساعات العمل"], errors="coerce"
         ).fillna(0.0)
@@ -2230,11 +2232,23 @@ with tab_employee_tracking:
             "ساعات العمل", "السلفة (ج.م)",
         ]].copy()
         report_display["التاريخ"] = report_display["التاريخ"].dt.strftime("%Y-%m-%d")
-        st.dataframe(
-            report_display.style.format({
+        def report_status_style(statuses):
+            styles = []
+            for status in statuses:
+                if "OFF" in str(status).upper():
+                    styles.append("background-color: #f6eddc; color: #8b612e; font-weight: 600")
+                elif "حضور" in str(status):
+                    styles.append("background-color: #e7f1ea; color: #367454; font-weight: 600")
+                else:
+                    styles.append("background-color: #f6e9e6; color: #a84f45; font-weight: 600")
+            return styles
+
+        styled_report = report_display.style.format({
                 "ساعات العمل": "{:,.2f}",
                 "السلفة (ج.م)": "{:,.2f}",
-            }),
+            }).apply(report_status_style, subset=["الحالة"])
+        st.dataframe(
+            styled_report,
             use_container_width=True,
             hide_index=True,
         )
@@ -2247,24 +2261,24 @@ with tab_employee_tracking:
             mime="text/csv",
             key="employee_monthly_report_download",
         )
-        st.markdown("#### تفاصيل الحضور والانصراف المحفوظة")
-        tracking_display = tracking_view.copy()
-        tracking_display["التاريخ"] = tracking_display["التاريخ"].dt.strftime("%Y-%m-%d")
-        st.dataframe(
-            tracking_display[[
-                "الموظف", "التاريخ", "اليوم", "الحضور", "الانصراف",
-                "ساعات العمل", "السلفة (ج.م)", "الفريق",
-            ]],
-            use_container_width=True,
-            hide_index=True,
-        )
-        st.download_button(
-            "تنزيل بيانات متابعة الموظفين كملف CSV",
-            data=tracking_view.assign(
-                **{"التاريخ": tracking_view["التاريخ"].dt.strftime("%Y-%m-%d")}
-            ).to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"onespot_employee_tracking_{selected_tracking_month.replace(' ', '_')}.csv",
-            mime="text/csv",
-            key="employee_tracking_download",
-        )
+        with st.expander("عرض جميع السجلات المحفوظة", expanded=False):
+            tracking_display = tracking_view.copy()
+            tracking_display["التاريخ"] = tracking_display["التاريخ"].dt.strftime("%Y-%m-%d")
+            st.dataframe(
+                tracking_display[[
+                    "الموظف", "التاريخ", "اليوم", "الحضور", "الانصراف",
+                    "ساعات العمل", "السلفة (ج.م)", "الفريق",
+                ]],
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.download_button(
+                "تنزيل بيانات متابعة الموظفين كملف CSV",
+                data=tracking_view.assign(
+                    **{"التاريخ": tracking_view["التاريخ"].dt.strftime("%Y-%m-%d")}
+                ).to_csv(index=False).encode("utf-8-sig"),
+                file_name=f"onespot_employee_tracking_{selected_tracking_month.replace(' ', '_')}.csv",
+                mime="text/csv",
+                key="employee_tracking_download",
+            )
     
