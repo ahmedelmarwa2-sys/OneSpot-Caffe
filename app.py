@@ -529,11 +529,42 @@ def attendance_day_mask(frame):
   ).fillna(0)
   has_hours = hours > 0
   has_punch = pd.Series(False, index=frame.index)
+  off_marker = re.compile(
+      r"\boff\b|week\s*off|holiday|vacation|\bleave\b|إجاز|اجاز|راحة|عطلة|اوف",
+      flags=re.IGNORECASE,
+  )
   for column in ("الحضور", "الانصراف"):
     if column in frame:
       values = frame[column].fillna("").astype(str).str.strip().str.lower()
-      has_punch |= ~values.isin(["", "nan", "none", "nat"])
+      has_punch |= ~values.isin(["", "nan", "none", "nat"]) & ~values.str.contains(
+          off_marker, na=False
+      )
   return has_hours | has_punch
+
+
+def attendance_off_mask(frame):
+  """Recognize OFF/leave markers preserved in the Excel day or punch cells."""
+  markers = re.compile(
+      r"\boff\b|week\s*off|holiday|vacation|\bleave\b|إجاز|اجاز|راحة|عطلة|اوف",
+      flags=re.IGNORECASE,
+  )
+  off = pd.Series(False, index=frame.index)
+  for column in ("اليوم", "الحضور", "الانصراف"):
+    if column in frame:
+      off |= frame[column].fillna("").astype(str).str.contains(markers, na=False)
+  return off
+
+
+def attendance_status_for_row(row):
+  has_work = bool(attendance_day_mask(pd.DataFrame([row])).iloc[0])
+  is_off = bool(attendance_off_mask(pd.DataFrame([row])).iloc[0])
+  if is_off and has_work:
+    return "حضور في يوم OFF"
+  if has_work:
+    return "حضور"
+  if is_off:
+    return "إجازة (OFF)"
+  return "لا يوجد تسجيل"
 
 
 def save_employee_attendance(attendance_df):
@@ -817,10 +848,19 @@ def read_attendance_with_builtin_excel(uploaded_file):
           advance = float(get_cell(row_values, "salary advance") or 0)
         except (TypeError, ValueError):
           advance = 0.0
+        raw_day = get_cell(row_values, "day")
+        if any(
+            re.search(r"\boff\b", str(value), flags=re.IGNORECASE)
+            for value in row_values.values() if value is not None
+        ):
+          raw_day = "OFF"
+        parsed_day = as_excel_datetime(raw_day) if raw_day is not None else None
+        if isinstance(raw_day, str) and parsed_day is not None and pd.isna(parsed_day):
+          parsed_day = raw_day.strip()
         records.append({
             "الموظف": employee_name,
             "التاريخ": pd.Timestamp(parsed_date).normalize(),
-            "اليوم": as_excel_datetime(get_cell(row_values, "day")) if get_cell(row_values, "day") is not None else None,
+            "اليوم": parsed_day,
             "الحضور": as_excel_time(get_cell(row_values, "start time")),
             "الانصراف": as_excel_time(get_cell(row_values, "end time")),
             "ساعات العمل": hours,
@@ -887,12 +927,19 @@ def read_attendance_excel(uploaded_file):
           idx = positions.get(field)
           return row[idx] if idx is not None and idx < len(row) else None
 
+        day_value = cell_value("day")
+        if any(
+            re.search(r"\boff\b", str(value), flags=re.IGNORECASE)
+            for value in row if value is not None
+        ):
+          day_value = "OFF"
+
         hours = pd.to_numeric(cell_value("hours"), errors="coerce")
         advance = pd.to_numeric(cell_value("salary advance"), errors="coerce")
         attendance_rows.append({
             "الموظف": employee_name,
             "التاريخ": date_value.normalize(),
-            "اليوم": cell_value("day"),
+            "اليوم": day_value,
             "الحضور": cell_value("start time"),
             "الانصراف": cell_value("end time"),
             "ساعات العمل": 0.0 if pd.isna(hours) else float(hours),
@@ -2121,6 +2168,84 @@ with tab_employee_tracking:
             }),
             use_container_width=True,
             hide_index=True,
+        )
+        st.markdown("#### التقرير الشهري للموظف")
+        report_cols = st.columns(2)
+        report_employees = sorted(
+            tracking_df["الموظف"].dropna().astype(str).str.strip().unique().tolist(),
+            key=str.casefold,
+        )
+        selected_report_employee = report_cols[0].selectbox(
+            "اختر الموظف:", report_employees, key="employee_monthly_report_employee"
+        )
+        month_names_ar = [
+            "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+            "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+        ]
+        selected_report_month = report_cols[1].selectbox(
+            "اختر الشهر:", tracking_months,
+            format_func=lambda value: (
+                f"{month_names_ar[int(value[5:7]) - 1]} {value[:4]}"
+            ),
+            key="employee_monthly_report_month",
+        )
+
+        report_rows = tracking_df[
+            (tracking_df["الموظف"].astype(str).str.strip() == selected_report_employee)
+            & (tracking_df["التاريخ"].dt.strftime("%Y-%m") == selected_report_month)
+        ].copy()
+        month_start = pd.Period(selected_report_month, freq="M").start_time.normalize()
+        calendar = pd.DataFrame({
+            "التاريخ": pd.date_range(month_start, periods=month_start.days_in_month, freq="D")
+        })
+        report_rows = calendar.merge(report_rows, on="التاريخ", how="left")
+        weekday_ar = {
+            0: "الاثنين", 1: "الثلاثاء", 2: "الأربعاء", 3: "الخميس",
+            4: "الجمعة", 5: "السبت", 6: "الأحد",
+        }
+        report_rows["اليوم"] = report_rows.apply(
+            lambda row: row["اليوم"] if pd.notna(row.get("اليوم"))
+            else weekday_ar[row["التاريخ"].weekday()], axis=1
+        )
+        report_rows["ساعات العمل"] = pd.to_numeric(
+            report_rows["ساعات العمل"], errors="coerce"
+        ).fillna(0.0)
+        report_rows["السلفة (ج.م)"] = pd.to_numeric(
+            report_rows["السلفة (ج.م)"], errors="coerce"
+        ).fillna(0.0)
+        report_rows["الحالة"] = report_rows.apply(attendance_status_for_row, axis=1)
+        report_attended = int(report_rows["الحالة"].isin(["حضور", "حضور في يوم OFF"]).sum())
+        report_off = int(report_rows["الحالة"].str.contains("OFF", case=False).sum())
+        report_unrecorded = int(report_rows["الحالة"].eq("لا يوجد تسجيل").sum())
+        report_hours = float(report_rows["ساعات العمل"].sum())
+        report_advances = float(report_rows["السلفة (ج.م)"].sum())
+        report_metrics = st.columns(5)
+        report_metrics[0].metric("أيام الحضور", f"{report_attended}")
+        report_metrics[1].metric("أيام الإجازة (OFF)", f"{report_off}")
+        report_metrics[2].metric("أيام بلا سجل", f"{report_unrecorded}")
+        report_metrics[3].metric("إجمالي الساعات", f"{report_hours:,.2f}")
+        report_metrics[4].metric("السلف", format_currency(report_advances))
+        report_display = report_rows[[
+            "التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف",
+            "ساعات العمل", "السلفة (ج.م)",
+        ]].copy()
+        report_display["التاريخ"] = report_display["التاريخ"].dt.strftime("%Y-%m-%d")
+        st.dataframe(
+            report_display.style.format({
+                "ساعات العمل": "{:,.2f}",
+                "السلفة (ج.م)": "{:,.2f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.download_button(
+            "تنزيل تقرير الموظف لهذا الشهر",
+            data=report_display.to_csv(index=False).encode("utf-8-sig"),
+            file_name=(
+                f"onespot_{selected_report_employee}_{selected_report_month}.csv"
+            ),
+            mime="text/csv",
+            key="employee_monthly_report_download",
         )
         st.markdown("#### تفاصيل الحضور والانصراف المحفوظة")
         tracking_display = tracking_view.copy()
