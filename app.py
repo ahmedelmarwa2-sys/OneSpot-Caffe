@@ -311,19 +311,6 @@ def ensure_database(engine):
         value TEXT NOT NULL
       )
     """))
-    connection.execute(text("""
-      CREATE TABLE IF NOT EXISTS attendance_records (
-        employee TEXT NOT NULL,
-        work_date DATE NOT NULL,
-        day_label TEXT,
-        clock_in TEXT,
-        clock_out TEXT,
-        hours DOUBLE PRECISION NOT NULL DEFAULT 0,
-        salary_advance DOUBLE PRECISION NOT NULL DEFAULT 0,
-        team TEXT NOT NULL DEFAULT 'OneSpot',
-        PRIMARY KEY (employee, work_date)
-      )
-    """))
     imported = connection.execute(
         text("SELECT value FROM onespot_metadata WHERE key = 'csv_import_v1'")
     ).scalar_one_or_none()
@@ -397,72 +384,6 @@ def save_data(df):
     connection.execute(text("DELETE FROM transactions"))
     if not df.empty:
       df.to_sql("transactions", con=connection, if_exists="append", index=False)
-
-
-def save_attendance_data(df):
-  engine = get_database_engine()
-  if engine is None or df.empty:
-    return
-  from sqlalchemy import text
-
-  ensure_database(engine)
-  rows = []
-  for row in df.to_dict("records"):
-    work_date = pd.to_datetime(row["التاريخ"], errors="coerce")
-    if pd.isna(work_date):
-      continue
-    rows.append({
-        "employee": str(row["الموظف"]),
-        "work_date": work_date.date(),
-        "day_label": None if pd.isna(row.get("اليوم")) else str(row.get("اليوم")),
-        "clock_in": None if pd.isna(row.get("الحضور")) else str(row.get("الحضور")),
-        "clock_out": None if pd.isna(row.get("الانصراف")) else str(row.get("الانصراف")),
-        "hours": float(row.get("ساعات العمل") or 0),
-        "salary_advance": float(row.get("السلفة (ج.م)") or 0),
-        "team": "OneSpot",
-    })
-  if not rows:
-    return
-  with engine.begin() as connection:
-    connection.execute(text("""
-      INSERT INTO attendance_records
-        (employee, work_date, day_label, clock_in, clock_out, hours, salary_advance, team)
-      VALUES
-        (:employee, :work_date, :day_label, :clock_in, :clock_out, :hours, :salary_advance, :team)
-      ON CONFLICT (employee, work_date) DO UPDATE SET
-        day_label = EXCLUDED.day_label,
-        clock_in = EXCLUDED.clock_in,
-        clock_out = EXCLUDED.clock_out,
-        hours = EXCLUDED.hours,
-        salary_advance = EXCLUDED.salary_advance,
-        team = EXCLUDED.team
-    """), rows)
-
-
-def load_attendance_data():
-  engine = get_database_engine()
-  if engine is None:
-    return pd.DataFrame()
-  from sqlalchemy import text
-
-  ensure_database(engine)
-  saved = pd.read_sql_query(text("""
-    SELECT employee, work_date, day_label, clock_in, clock_out, hours, salary_advance, team
-    FROM attendance_records
-    ORDER BY work_date DESC, employee
-  """), engine)
-  if saved.empty:
-    return pd.DataFrame()
-  return saved.rename(columns={
-      "employee": "الموظف",
-      "work_date": "التاريخ",
-      "day_label": "اليوم",
-      "clock_in": "الحضور",
-      "clock_out": "الانصراف",
-      "hours": "ساعات العمل",
-      "salary_advance": "السلفة (ج.م)",
-      "team": "الفريق",
-  }).assign(**{"التاريخ": lambda frame: pd.to_datetime(frame["التاريخ"], errors="coerce")})
 
 
 def read_attendance_with_builtin_excel(uploaded_file):
@@ -1391,7 +1312,6 @@ with tab_attendance:
                 attendance_df = attendance_df.drop_duplicates(
                     subset=["الموظف", "التاريخ"], keep="last"
                 ).sort_values(["التاريخ", "الموظف"], ascending=[False, True])
-                save_attendance_data(attendance_df)
                 st.session_state["attendance_imported_df"] = attendance_df
                 if ignored_sheets:
                     st.caption("تم تجاهل الأوراق غير الخاصة بسجلات الموظفين: " + "، ".join(ignored_sheets))
@@ -1403,7 +1323,6 @@ with tab_attendance:
                     attendance_df = attendance_df.drop_duplicates(
                         subset=["الموظف", "التاريخ"], keep="last"
                     ).sort_values(["التاريخ", "الموظف"], ascending=[False, True])
-                    save_attendance_data(attendance_df)
                     st.session_state["attendance_imported_df"] = attendance_df
                     if ignored_sheets:
                         st.caption("تم تجاهل الأوراق غير الخاصة بسجلات الموظفين: " + "، ".join(ignored_sheets))
@@ -1415,14 +1334,6 @@ with tab_attendance:
             st.error(f"تعذر قراءة ملف الحضور. تأكد أن الملف سليم ثم ارفعه مرة أخرى. التفاصيل: {exc}")
 
     attendance_df = st.session_state.get("attendance_imported_df")
-    if read_database_url():
-        try:
-            persisted_attendance = load_attendance_data()
-            if not persisted_attendance.empty:
-                attendance_df = persisted_attendance
-                st.session_state["attendance_imported_df"] = persisted_attendance
-        except Exception as exc:
-            st.warning(f"تعذر تحميل بيانات الحضور المحفوظة من Neon: {exc}")
     if attendance_df is not None and not attendance_df.empty:
         month_values = sorted(attendance_df["التاريخ"].dt.strftime("%Y-%m").unique(), reverse=True)
         selected_attendance_month = st.selectbox(
