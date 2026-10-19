@@ -794,6 +794,79 @@ def read_attendance_with_builtin_excel(uploaded_file):
   return records, ignored_sheets
 
 
+def read_attendance_excel(uploaded_file):
+  try:
+    from openpyxl import load_workbook
+  except ImportError:
+    return read_attendance_with_builtin_excel(uploaded_file)
+
+  attendance_book = load_workbook(
+      uploaded_file, read_only=True, data_only=True, keep_vba=False
+  )
+  attendance_rows = []
+  ignored_sheets = []
+  try:
+    for sheet in attendance_book.worksheets:
+      if sheet.title.strip().lower() == "summary":
+        ignored_sheets.append(sheet.title)
+        continue
+      header_row = None
+      headers = []
+      for row_num, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        normalized = [
+            str(value).strip().lower().replace("\n", " ") if value is not None else ""
+            for value in row
+        ]
+        if "date" in normalized and "hours" in normalized:
+          header_row = row_num
+          headers = normalized
+          break
+
+      if header_row is None:
+        ignored_sheets.append(sheet.title)
+        continue
+
+      positions = {
+          name: headers.index(name)
+          for name in ["date", "day", "salary advance", "start time", "end time", "hours"]
+          if name in headers
+      }
+      employee_name = None
+      for row in sheet.iter_rows(min_row=1, max_row=min(header_row, 8), values_only=True):
+        if len(row) > 2 and str(row[0]).strip().lower() == "name:" and row[2]:
+          employee_name = str(row[2]).strip()
+          break
+      employee_name = employee_name or sheet.title
+
+      for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
+        date_value = row[positions["date"]] if positions["date"] < len(row) else None
+        if date_value is None:
+          continue
+        date_value = pd.to_datetime(date_value, errors="coerce")
+        if pd.isna(date_value):
+          continue
+
+        def cell_value(field):
+          idx = positions.get(field)
+          return row[idx] if idx is not None and idx < len(row) else None
+
+        hours = pd.to_numeric(cell_value("hours"), errors="coerce")
+        advance = pd.to_numeric(cell_value("salary advance"), errors="coerce")
+        attendance_rows.append({
+            "الموظف": employee_name,
+            "التاريخ": date_value.normalize(),
+            "اليوم": cell_value("day"),
+            "الحضور": cell_value("start time"),
+            "الانصراف": cell_value("end time"),
+            "ساعات العمل": 0.0 if pd.isna(hours) else float(hours),
+            "السلفة (ج.م)": 0.0 if pd.isna(advance) else float(advance),
+            "الفريق": "OneSpot",
+        })
+  finally:
+    attendance_book.close()
+  return attendance_rows, ignored_sheets
+
+
 df_all, data_error = load_data()
 data_blocked = data_error is not None
 
@@ -1802,79 +1875,41 @@ with tab_attendance:
     )
 
     if attendance_file is not None:
-        try:
-            from openpyxl import load_workbook
-
-            attendance_book = load_workbook(
-                attendance_file, read_only=True, data_only=True, keep_vba=False
-            )
-            attendance_rows = []
-            ignored_sheets = []
-            for sheet in attendance_book.worksheets:
-                if sheet.title.strip().lower() == "summary":
-                    ignored_sheets.append(sheet.title)
-                    continue
-                header_row = None
-                headers = []
-                for row_num, row in enumerate(sheet.iter_rows(values_only=True), start=1):
-                    normalized = [str(value).strip().lower().replace("\n", " ") if value is not None else "" for value in row]
-                    if "date" in normalized and "hours" in normalized:
-                        header_row = row_num
-                        headers = normalized
-                        break
-
-                if header_row is None:
-                    ignored_sheets.append(sheet.title)
-                    continue
-
-                positions = {name: headers.index(name) for name in ["date", "day", "salary advance", "start time", "end time", "hours"] if name in headers}
-                employee_name = None
-                for row in sheet.iter_rows(min_row=1, max_row=min(header_row, 8), values_only=True):
-                    if len(row) > 2 and str(row[0]).strip().lower() == "name:" and row[2]:
-                        employee_name = str(row[2]).strip()
-                        break
-                employee_name = employee_name or sheet.title
-
-                for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
-                    date_value = row[positions["date"]] if positions["date"] < len(row) else None
-                    if date_value is None:
-                        continue
-                    date_value = pd.to_datetime(date_value, errors="coerce")
-                    if pd.isna(date_value):
-                        continue
-                    def cell_value(field):
-                        idx = positions.get(field)
-                        return row[idx] if idx is not None and idx < len(row) else None
-
-                    hours = pd.to_numeric(cell_value("hours"), errors="coerce")
-                    advance = pd.to_numeric(cell_value("salary advance"), errors="coerce")
-                    attendance_rows.append({
-                        "الموظف": employee_name,
-                        "التاريخ": date_value.normalize(),
-                        "اليوم": cell_value("day"),
-                        "الحضور": cell_value("start time"),
-                        "الانصراف": cell_value("end time"),
-                        "ساعات العمل": 0.0 if pd.isna(hours) else float(hours),
-                        "السلفة (ج.م)": 0.0 if pd.isna(advance) else float(advance),
-                        "الفريق": "OneSpot",
-                    })
-
-            attendance_book.close()
-            if not attendance_rows:
-                st.warning("لم أجد سجلات حضور. تأكد أن أوراق الموظفين تحتوي على أعمدة Date وHours.")
-            else:
-                process_attendance_upload(attendance_rows, attendance_file, ignored_sheets)
-        except ImportError:
+        with st.status("جاري تجهيز ملف الحضور والانصراف...", expanded=True) as upload_status:
             try:
-                attendance_rows, ignored_sheets = read_attendance_with_builtin_excel(attendance_file)
-                if attendance_rows:
-                    process_attendance_upload(attendance_rows, attendance_file, ignored_sheets)
+                upload_status.write("📂 قراءة أوراق الموظفين وبيانات الحضور...")
+                attendance_rows, ignored_sheets = read_attendance_excel(attendance_file)
+                upload_status.write("🔎 مراجعة التواريخ وتخطي السجلات المكررة...")
+                upload_status.write("💾 حفظ السجلات الجديدة في متابعة الموظفين...")
+                imported_df = process_attendance_upload(
+                    attendance_rows, attendance_file, ignored_sheets
+                )
+                upload_result = st.session_state.get("attendance_upload_result", {})
+                if imported_df is None:
+                    upload_status.update(
+                        label="لم يتم العثور على سجلات حضور صالحة",
+                        state="error",
+                        expanded=True,
+                    )
+                elif upload_result.get("error"):
+                    upload_status.update(
+                        label="تمت قراءة الملف، لكن تعذر حفظ السجلات في Neon",
+                        state="error",
+                        expanded=True,
+                    )
                 else:
-                    st.warning("لم أجد سجلات حضور في أوراق الموظفين.")
+                    upload_status.update(
+                        label=f"اكتمل تحميل الملف — أُضيف {upload_result.get('inserted', 0)} سجل جديد",
+                        state="complete",
+                        expanded=False,
+                    )
             except Exception as exc:
-                st.error(f"تعذر قراءة ملف الحضور. تأكد أن الملف سليم ثم ارفعه مرة أخرى. التفاصيل: {exc}")
-        except Exception as exc:
-            st.error(f"تعذر قراءة ملف الحضور. تأكد أن الملف سليم ثم ارفعه مرة أخرى. التفاصيل: {exc}")
+                upload_status.update(
+                    label="تعذر قراءة الملف أو حفظ بياناته",
+                    state="error",
+                    expanded=True,
+                )
+                st.error(f"تأكد أن ملف Excel سليم ثم ارفعه مرة أخرى. التفاصيل: {exc}")
 
     attendance_df = st.session_state.get("attendance_imported_df")
     if attendance_df is not None and not attendance_df.empty:
