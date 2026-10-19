@@ -332,6 +332,8 @@ def ensure_database(engine):
       if legacy_error:
         raise ValueError(legacy_error)
       if not legacy_df.empty:
+        # PostgreSQL DATE columns must receive Python date values, not CSV strings.
+        legacy_df["Date"] = pd.to_datetime(legacy_df["Date"], errors="raise").dt.date
         legacy_df.to_sql("transactions", con=connection, if_exists="append", index=False)
       connection.execute(
           text("INSERT INTO onespot_metadata (key, value) VALUES ('csv_import_v1', 'done')")
@@ -380,7 +382,8 @@ def save_data(df):
   if not df["Type"].isin(["Income", "Expense"]).all():
     raise ValueError("يوجد نوع معاملة غير صالح.")
   df["ID"] = df["ID"].astype("int64")
-  df["Date"] = parsed_dates.dt.strftime("%Y-%m-%d")
+  # Bind as a PostgreSQL DATE instead of sending VARCHAR values.
+  df["Date"] = parsed_dates.dt.date
   df["Month_No"] = parsed_dates.dt.month
   df["Branch"] = df["Branch"].fillna(LEGACY_BRANCH).astype(str)
 
