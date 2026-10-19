@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import re
 import zipfile
+import hashlib
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from pathlib import Path
@@ -338,6 +339,21 @@ def ensure_database(engine):
         active BOOLEAN NOT NULL DEFAULT TRUE
       )
     """))
+    connection.execute(text("""
+      CREATE TABLE IF NOT EXISTS employee_attendance (
+        attendance_id BIGSERIAL PRIMARY KEY,
+        employee_name TEXT NOT NULL,
+        attendance_date DATE NOT NULL,
+        day_name TEXT,
+        check_in TEXT,
+        check_out TEXT,
+        work_hours DOUBLE PRECISION NOT NULL DEFAULT 0,
+        salary_advance DOUBLE PRECISION NOT NULL DEFAULT 0,
+        team TEXT NOT NULL DEFAULT 'OneSpot',
+        imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (employee_name, attendance_date)
+      )
+    """))
     imported = connection.execute(
         text("SELECT value FROM onespot_metadata WHERE key = 'csv_import_v1'")
     ).scalar_one_or_none()
@@ -504,6 +520,140 @@ def load_transaction_audit(limit=200):
   if not AUDIT_FILE.exists():
     return pd.DataFrame()
   return pd.read_csv(AUDIT_FILE).tail(limit).iloc[::-1].reset_index(drop=True)
+
+
+def save_employee_attendance(attendance_df):
+  """Persist only new employee/date rows; never overwrite an existing record."""
+  if attendance_df is None or attendance_df.empty:
+    return 0
+  engine = get_database_engine()
+  if engine is None:
+    raise RuntimeError("Neon غير متصل؛ لم يتم حفظ بيانات متابعة الموظفين.")
+
+  from sqlalchemy import text
+
+  ensure_database(engine)
+
+  def text_value(value):
+    if value is None or pd.isna(value):
+      return None
+    if isinstance(value, (datetime.datetime, datetime.time)):
+      return value.isoformat()
+    return str(value).strip()
+
+  records = []
+  for row in attendance_df.to_dict("records"):
+    parsed_date = pd.to_datetime(row.get("التاريخ"), errors="coerce")
+    if pd.isna(parsed_date):
+      continue
+    hours = pd.to_numeric(row.get("ساعات العمل"), errors="coerce")
+    advance = pd.to_numeric(row.get("السلفة (ج.م)"), errors="coerce")
+    records.append({
+        "employee_name": str(row.get("الموظف", "")).strip(),
+        "attendance_date": parsed_date.date(),
+        "day_name": text_value(row.get("اليوم")),
+        "check_in": text_value(row.get("الحضور")),
+        "check_out": text_value(row.get("الانصراف")),
+        "work_hours": 0.0 if pd.isna(hours) else float(hours),
+        "salary_advance": 0.0 if pd.isna(advance) else float(advance),
+        "team": text_value(row.get("الفريق")) or "OneSpot",
+    })
+
+  inserted = 0
+  with engine.begin() as connection:
+    for record in records:
+      result = connection.execute(text("""
+        INSERT INTO employee_attendance
+          (employee_name, attendance_date, day_name, check_in, check_out,
+           work_hours, salary_advance, team)
+        VALUES
+          (:employee_name, :attendance_date, :day_name, :check_in, :check_out,
+           :work_hours, :salary_advance, :team)
+        ON CONFLICT (employee_name, attendance_date) DO NOTHING
+      """), record)
+      if result.rowcount and result.rowcount > 0:
+        inserted += result.rowcount
+  return inserted
+
+
+def load_employee_attendance():
+  engine = get_database_engine()
+  if engine is None:
+    return None
+  from sqlalchemy import text
+
+  ensure_database(engine)
+  attendance_df = pd.read_sql_query(text("""
+    SELECT employee_name AS "الموظف",
+           attendance_date AS "التاريخ",
+           day_name AS "اليوم",
+           check_in AS "الحضور",
+           check_out AS "الانصراف",
+           work_hours AS "ساعات العمل",
+           salary_advance AS "السلفة (ج.م)",
+           team AS "الفريق"
+    FROM employee_attendance
+    ORDER BY attendance_date DESC, employee_name
+  """), engine)
+  if attendance_df.empty:
+    return pd.DataFrame(columns=[
+        "الموظف", "التاريخ", "اليوم", "الحضور", "الانصراف",
+        "ساعات العمل", "السلفة (ج.م)", "الفريق",
+    ])
+  attendance_df["التاريخ"] = pd.to_datetime(attendance_df["التاريخ"], errors="coerce").dt.normalize()
+  attendance_df["ساعات العمل"] = pd.to_numeric(attendance_df["ساعات العمل"], errors="coerce").fillna(0.0)
+  attendance_df["السلفة (ج.م)"] = pd.to_numeric(attendance_df["السلفة (ج.م)"], errors="coerce").fillna(0.0)
+  return attendance_df
+
+
+def process_attendance_upload(attendance_rows, uploaded_file, ignored_sheets):
+  if not attendance_rows:
+    st.warning("لم أجد سجلات حضور في أوراق الموظفين.")
+    return None
+
+  raw_count = len(attendance_rows)
+  attendance_df = pd.DataFrame(attendance_rows)
+  attendance_df["التاريخ"] = pd.to_datetime(attendance_df["التاريخ"], errors="coerce").dt.normalize()
+  attendance_df = attendance_df.dropna(subset=["التاريخ"])
+  attendance_df = attendance_df.drop_duplicates(
+      subset=["الموظف", "التاريخ"], keep="last"
+  ).sort_values(["التاريخ", "الموظف"], ascending=[False, True])
+  duplicates_in_file = raw_count - len(attendance_df)
+  st.session_state["attendance_imported_df"] = attendance_df
+
+  upload_signature = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
+  if st.session_state.get("attendance_saved_upload_signature") != upload_signature:
+    try:
+      inserted_count = save_employee_attendance(attendance_df)
+      skipped_existing = len(attendance_df) - inserted_count
+      st.session_state["attendance_saved_upload_signature"] = upload_signature
+      st.session_state["attendance_upload_result"] = {
+          "signature": upload_signature,
+          "inserted": inserted_count,
+          "skipped": duplicates_in_file + skipped_existing,
+          "error": None,
+      }
+    except Exception as exc:
+      st.session_state["attendance_upload_result"] = {
+          "signature": upload_signature,
+          "inserted": 0,
+          "skipped": duplicates_in_file,
+          "error": str(exc),
+      }
+
+  result = st.session_state.get("attendance_upload_result", {})
+  if result.get("signature") == upload_signature:
+    if result.get("error"):
+      st.error(f"تعذر حفظ السجلات الجديدة في متابعة الموظفين: {result['error']}")
+    elif result.get("inserted", 0):
+      st.success(f"تم حفظ {result['inserted']} سجل جديد في متابعة الموظفين.")
+    else:
+      st.info("لا توجد سجلات جديدة للحفظ؛ التواريخ الموجودة لم تتكرر.")
+    if result.get("skipped", 0):
+      st.caption(f"تم تخطي {result['skipped']} سجل مكرر، والاحتفاظ بسجل واحد لكل موظف في اليوم.")
+  if ignored_sheets:
+    st.caption("تم تجاهل الأوراق غير الخاصة بسجلات الموظفين: " + "، ".join(ignored_sheets))
+  return attendance_df
 
 
 def read_attendance_with_builtin_excel(uploaded_file):
@@ -757,8 +907,8 @@ st.markdown(
     '<div class="onespot-sub">COFFEE &amp; MORE · FINANCIAL SYSTEM</div></div></div>',
     unsafe_allow_html=True,
 )
-tab_home, tab_add, tab_history, tab_admin, tab_reports, tab_attendance = st.tabs(
-    ["🏠 الرئيسية", "➕ إضافة قيد", "📒 سجل المعاملات", "🗂️ إدارة القيود", "📊 مقارنة وتقارير", "🕒 الحضور والانصراف"]
+tab_home, tab_add, tab_history, tab_admin, tab_reports, tab_attendance, tab_employee_tracking = st.tabs(
+    ["🏠 الرئيسية", "➕ إضافة قيد", "📒 سجل المعاملات", "🗂️ إدارة القيود", "📊 مقارنة وتقارير", "🕒 الحضور والانصراف", "👥 متابعة الموظفين"]
 )
 
 # =====================================================
@@ -1640,7 +1790,8 @@ with tab_attendance:
     st.caption(
         "ارفع ملف الحضور بصيغة Excel لعرض ساعات العمل والسلف لكل موظف. "
         "سيتم جمع الموظفين معًا تحت OneSpot لأن مواقع عملهم متغيرة. "
-        "البيانات للعرض المؤقت فقط ولا تُحفظ في Neon."
+        "ملف Excel نفسه لا يُحفظ. السجلات الجديدة فقط تُحفظ في Neon للمتابعة، "
+        "والتاريخ المكرر للموظف نفسه يتم تخطيه."
     )
 
     attendance_file = st.file_uploader(
@@ -1712,24 +1863,12 @@ with tab_attendance:
             if not attendance_rows:
                 st.warning("لم أجد سجلات حضور. تأكد أن أوراق الموظفين تحتوي على أعمدة Date وHours.")
             else:
-                attendance_df = pd.DataFrame(attendance_rows)
-                attendance_df = attendance_df.drop_duplicates(
-                    subset=["الموظف", "التاريخ"], keep="last"
-                ).sort_values(["التاريخ", "الموظف"], ascending=[False, True])
-                st.session_state["attendance_imported_df"] = attendance_df
-                if ignored_sheets:
-                    st.caption("تم تجاهل الأوراق غير الخاصة بسجلات الموظفين: " + "، ".join(ignored_sheets))
+                process_attendance_upload(attendance_rows, attendance_file, ignored_sheets)
         except ImportError:
             try:
                 attendance_rows, ignored_sheets = read_attendance_with_builtin_excel(attendance_file)
                 if attendance_rows:
-                    attendance_df = pd.DataFrame(attendance_rows)
-                    attendance_df = attendance_df.drop_duplicates(
-                        subset=["الموظف", "التاريخ"], keep="last"
-                    ).sort_values(["التاريخ", "الموظف"], ascending=[False, True])
-                    st.session_state["attendance_imported_df"] = attendance_df
-                    if ignored_sheets:
-                        st.caption("تم تجاهل الأوراق غير الخاصة بسجلات الموظفين: " + "، ".join(ignored_sheets))
+                    process_attendance_upload(attendance_rows, attendance_file, ignored_sheets)
                 else:
                     st.warning("لم أجد سجلات حضور في أوراق الموظفين.")
             except Exception as exc:
@@ -1819,5 +1958,110 @@ with tab_attendance:
             data=attendance_view.assign(**{"التاريخ": attendance_view["التاريخ"].dt.strftime("%Y-%m-%d")}).to_csv(index=False).encode("utf-8-sig"),
             file_name=f"onespot_attendance_{selected_attendance_month.replace(' ', '_')}.csv",
             mime="text/csv",
+        )
+
+with tab_employee_tracking:
+    st.subheader("متابعة الموظفين — OneSpot")
+    st.caption(
+        "كل ما ترفعه في تبويب الحضور والانصراف يظهر هنا محفوظًا في Neon. "
+        "يتم الاحتفاظ بسجل واحد لكل موظف في كل تاريخ؛ السجلات الجديدة فقط تُضاف."
+    )
+    try:
+        tracking_df = load_employee_attendance()
+    except Exception as exc:
+        tracking_df = None
+        st.error(f"تعذر تحميل متابعة الموظفين من Neon: {exc}")
+
+    if tracking_df is None:
+        st.warning("متابعة الموظفين تحتاج اتصال Neon. البيانات لم تُحفظ محليًا.")
+    elif tracking_df.empty:
+        st.info("لا توجد سجلات محفوظة بعد. ارفع ملف Excel من تبويب الحضور والانصراف لإضافة السجلات الجديدة.")
+    else:
+        monthly_hours_target = 234.0
+        tracking_months = sorted(
+            tracking_df["التاريخ"].dt.strftime("%Y-%m").dropna().unique(), reverse=True
+        )
+        selected_tracking_month = st.selectbox(
+            "الشهر:", ["كل الشهور"] + tracking_months,
+            key="employee_tracking_month_filter",
+        )
+        tracking_view = tracking_df.copy()
+        if selected_tracking_month != "كل الشهور":
+            tracking_view = tracking_view[
+                tracking_view["التاريخ"].dt.strftime("%Y-%m") == selected_tracking_month
+            ]
+
+        total_tracking_hours = tracking_view["ساعات العمل"].sum()
+        total_tracking_advances = tracking_view["السلفة (ج.م)"].sum()
+        tracking_employee_count = tracking_view["الموظف"].nunique()
+        tracking_worked_days = int((tracking_view["ساعات العمل"] > 0).sum())
+        tracking_metrics = st.columns(4)
+        tracking_metrics[0].metric("عدد الموظفين", f"{tracking_employee_count}")
+        tracking_metrics[1].metric("إجمالي ساعات العمل", f"{total_tracking_hours:,.2f} ساعة")
+        tracking_metrics[2].metric("أيام العمل المسجلة", f"{tracking_worked_days}")
+        tracking_metrics[3].metric("إجمالي السلف", format_currency(total_tracking_advances))
+
+        tracking_view = tracking_view.copy()
+        tracking_view["الشهر المحسوب"] = tracking_view["التاريخ"].dt.strftime("%Y-%m")
+        monthly_tracking_summary = tracking_view.groupby(
+            ["الموظف", "الشهر المحسوب"], as_index=False
+        ).agg(
+            **{"أيام العمل": ("ساعات العمل", lambda values: int((values > 0).sum())),
+               "إجمالي الساعات": ("ساعات العمل", "sum"),
+               "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
+        )
+        tracking_summary = monthly_tracking_summary.groupby("الموظف", as_index=False).agg(
+            **{"عدد الشهور": ("الشهر المحسوب", "nunique"),
+               "أيام العمل": ("أيام العمل", "sum"),
+               "إجمالي الساعات": ("إجمالي الساعات", "sum"),
+               "إجمالي السلف (ج.م)": ("إجمالي السلف (ج.م)", "sum")}
+        )
+        tracking_summary["الساعات المستهدفة"] = (
+            tracking_summary["عدد الشهور"] * monthly_hours_target
+        )
+        tracking_summary["الفرق عن المستهدف"] = (
+            tracking_summary["إجمالي الساعات"] - tracking_summary["الساعات المستهدفة"]
+        )
+        tracking_summary["الحالة"] = tracking_summary["الفرق عن المستهدف"].apply(
+            lambda difference: "مكتمل" if abs(difference) < 0.01
+            else ("أعلى من المستهدف" if difference > 0 else "أقل من المستهدف")
+        )
+        tracking_summary = tracking_summary[
+            ["الموظف", "عدد الشهور", "أيام العمل", "إجمالي الساعات",
+             "الساعات المستهدفة", "الفرق عن المستهدف", "الحالة", "إجمالي السلف (ج.م)"]
+        ]
+        st.markdown("#### ملخص الموظفين")
+        st.caption("المستهدف 234 ساعة لكل موظف عن كل شهر ظاهر في السجلات.")
+        st.dataframe(
+            tracking_summary.style.format({
+                "عدد الشهور": "{:,.0f}",
+                "أيام العمل": "{:,.0f}",
+                "إجمالي الساعات": "{:,.2f}",
+                "الساعات المستهدفة": "{:,.2f}",
+                "الفرق عن المستهدف": "{:+,.2f}",
+                "إجمالي السلف (ج.م)": "{:,.2f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.markdown("#### تفاصيل الحضور والانصراف المحفوظة")
+        tracking_display = tracking_view.copy()
+        tracking_display["التاريخ"] = tracking_display["التاريخ"].dt.strftime("%Y-%m-%d")
+        st.dataframe(
+            tracking_display[[
+                "الموظف", "التاريخ", "اليوم", "الحضور", "الانصراف",
+                "ساعات العمل", "السلفة (ج.م)", "الفريق",
+            ]],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.download_button(
+            "تنزيل بيانات متابعة الموظفين كملف CSV",
+            data=tracking_view.assign(
+                **{"التاريخ": tracking_view["التاريخ"].dt.strftime("%Y-%m-%d")}
+            ).to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"onespot_employee_tracking_{selected_tracking_month.replace(' ', '_')}.csv",
+            mime="text/csv",
+            key="employee_tracking_download",
         )
     
