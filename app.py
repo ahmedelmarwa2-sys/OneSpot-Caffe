@@ -38,6 +38,7 @@ def format_currency(amount):
 
 DATA_FILE = Path("cafe_data.csv")
 BACKUP_FILE = Path("cafe_data.csv.bak")
+AUDIT_FILE = Path("cafe_audit_log.csv")
 
 COLUMNS = ["ID", "Date", "Month_No", "Branch", "Category", "Type", "Amount", "Description"]
 
@@ -311,6 +312,32 @@ def ensure_database(engine):
         value TEXT NOT NULL
       )
     """))
+    connection.execute(text("""
+      CREATE TABLE IF NOT EXISTS transaction_audit (
+        audit_id BIGSERIAL PRIMARY KEY,
+        occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        actor TEXT NOT NULL DEFAULT 'مستخدم التطبيق',
+        action TEXT NOT NULL,
+        transaction_id BIGINT NOT NULL,
+        transaction_date DATE,
+        branch TEXT,
+        category TEXT,
+        transaction_type TEXT,
+        amount DOUBLE PRECISION,
+        description TEXT
+      )
+    """))
+    connection.execute(text("""
+      CREATE TABLE IF NOT EXISTS recurring_expenses (
+        id BIGSERIAL PRIMARY KEY,
+        branch TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount DOUBLE PRECISION NOT NULL CHECK (amount > 0),
+        description TEXT NOT NULL,
+        due_day INTEGER NOT NULL DEFAULT 1 CHECK (due_day BETWEEN 1 AND 28),
+        active BOOLEAN NOT NULL DEFAULT TRUE
+      )
+    """))
     imported = connection.execute(
         text("SELECT value FROM onespot_metadata WHERE key = 'csv_import_v1'")
     ).scalar_one_or_none()
@@ -376,14 +403,107 @@ def save_data(df):
 
   engine = get_database_engine()
   if engine is None:
-    return save_csv_data(df)
+    previous_df, previous_error = load_csv_data()
+    if previous_error:
+      raise ValueError(previous_error)
+    events = build_transaction_audit_events(previous_df, df)
+    save_csv_data(df)
+    append_transaction_audit_csv(events)
+    return
   from sqlalchemy import text
 
   ensure_database(engine)
   with engine.begin() as connection:
+    old_rows = connection.execute(text(
+        'SELECT "ID", "Date", "Month_No", "Branch", "Category", "Type", "Amount", "Description" FROM transactions'
+    )).mappings().all()
+    old_df = pd.DataFrame(old_rows, columns=COLUMNS)
+    events = build_transaction_audit_events(old_df, df)
     connection.execute(text("DELETE FROM transactions"))
     if not df.empty:
       df.to_sql("transactions", con=connection, if_exists="append", index=False)
+    if events:
+      connection.execute(text("""
+        INSERT INTO transaction_audit
+          (actor, action, transaction_id, transaction_date, branch, category,
+           transaction_type, amount, description)
+        VALUES
+          (:actor, :action, :transaction_id, :transaction_date, :branch, :category,
+           :transaction_type, :amount, :description)
+      """), events)
+
+
+def build_transaction_audit_events(previous_df, current_df):
+  """Return audit rows for added, changed, or removed transactions."""
+  def normalize(row):
+    parsed_date = pd.to_datetime(row["Date"], errors="coerce")
+    return {
+        "transaction_id": int(row["ID"]),
+        "transaction_date": None if pd.isna(parsed_date) else parsed_date.date(),
+        "branch": str(row.get("Branch", "")),
+        "category": str(row.get("Category", "")),
+        "transaction_type": str(row.get("Type", "")),
+        "amount": float(row.get("Amount", 0) or 0),
+        "description": str(row.get("Description", "") or ""),
+    }
+
+  old = {
+      int(row["ID"]): normalize(row)
+      for _, row in previous_df.iterrows()
+  } if previous_df is not None and not previous_df.empty else {}
+  new = {
+      int(row["ID"]): normalize(row)
+      for _, row in current_df.iterrows()
+  } if current_df is not None and not current_df.empty else {}
+
+  events = []
+  for transaction_id in sorted(set(old) | set(new)):
+    before = old.get(transaction_id)
+    after = new.get(transaction_id)
+    if before == after:
+      continue
+    action = "إضافة" if before is None else "حذف" if after is None else "تعديل"
+    details = after or before
+    events.append({
+        "actor": "مستخدم التطبيق",
+        "action": action,
+        **details,
+    })
+
+  return events
+
+
+def append_transaction_audit_csv(events):
+  if not events:
+    return
+  timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+  audit_df = pd.DataFrame(events)
+  audit_df.insert(0, "occurred_at", timestamp)
+  audit_df.to_csv(
+      AUDIT_FILE,
+      mode="a",
+      header=not AUDIT_FILE.exists(),
+      index=False,
+      encoding="utf-8-sig",
+  )
+
+
+def load_transaction_audit(limit=200):
+  engine = get_database_engine()
+  if engine is not None:
+    from sqlalchemy import text
+
+    ensure_database(engine)
+    return pd.read_sql_query(text("""
+      SELECT occurred_at, actor, action, transaction_id, transaction_date,
+             branch, category, transaction_type, amount, description
+      FROM transaction_audit
+      ORDER BY audit_id DESC
+      LIMIT :limit
+    """), engine, params={"limit": int(limit)})
+  if not AUDIT_FILE.exists():
+    return pd.DataFrame()
+  return pd.read_csv(AUDIT_FILE).tail(limit).iloc[::-1].reset_index(drop=True)
 
 
 def read_attendance_with_builtin_excel(uploaded_file):
@@ -652,6 +772,13 @@ if "form_version" not in st.session_state:
 def transaction_form_fragment():
     st.subheader("＋ إضافة قيد جديد")
 
+    feedback = st.session_state.pop("transaction_save_feedback", None)
+    if feedback:
+        if feedback["duplicate"]:
+            st.warning(feedback["message"])
+        else:
+            st.success(feedback["message"])
+
     if data_blocked:
         st.warning("تم إيقاف تسجيل القيود حتى إصلاح ملف البيانات.")
         return
@@ -748,6 +875,15 @@ def transaction_form_fragment():
             st.error("تعذر التحقق من ملف البيانات: " + latest_error)
             return
 
+        duplicate_found = False
+        if not latest_df.empty:
+            duplicate_found = bool((
+                (pd.to_datetime(latest_df["Date"], errors="coerce").dt.date == tx_date)
+                & (latest_df["Branch"].astype(str) == transaction_branch)
+                & (pd.to_numeric(latest_df["Amount"], errors="coerce").round(2) == round(float(tx_amount), 2))
+                & (latest_df["Description"].fillna("").astype(str).str.strip().str.casefold() == tx_description.strip().casefold())
+            ).any())
+
         next_id = int(latest_df["ID"].max()) + 1 if not latest_df.empty else 1
         new_row = pd.DataFrame([{
             "ID": next_id,
@@ -764,7 +900,13 @@ def transaction_form_fragment():
         try:
             save_data(updated_df)
             st.session_state["form_version"] += 1
-            st.success(f"تم حفظ القيد رقم {next_id} بنجاح.")
+            message = f"تم حفظ القيد رقم {next_id} بنجاح."
+            if duplicate_found:
+                message += " يوجد قيد بنفس التاريخ والفرع والمبلغ والبيان؛ تم حفظه بناءً على اختيارك."
+            st.session_state["transaction_save_feedback"] = {
+                "duplicate": duplicate_found,
+                "message": message,
+            }
             st.rerun()
         except Exception as exc:
             st.error(f"تعذر حفظ القيد والحفاظ على البيانات. التفاصيل: {exc}")
@@ -1055,6 +1197,120 @@ with tab_history:
             show_branch_transactions(branch_frame, branch_name)
     
 with tab_admin:
+    st.subheader("نسخة احتياطية للقيود")
+    if data_view.empty:
+        st.info("لا توجد قيود لإنشاء نسخة احتياطية منها.")
+    else:
+        backup_df = data_view[COLUMNS].copy()
+        backup_df["Type"] = backup_df["Type"].map({"Income": "إيراد", "Expense": "مصروف"})
+        backup_df = backup_df.rename(columns={
+            "ID": "رقم القيد",
+            "Date": "التاريخ",
+            "Month_No": "رقم الشهر",
+            "Branch": "الفرع",
+            "Category": "البند",
+            "Type": "النوع",
+            "Amount": "المبلغ (ج.م)",
+            "Description": "البيان",
+        })
+        backup_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_csv = backup_df.to_csv(index=False).encode("utf-8-sig")
+        backup_buffer = BytesIO()
+        with pd.ExcelWriter(backup_buffer, engine="openpyxl") as writer:
+            backup_df.to_excel(writer, index=False, sheet_name="القيود")
+        backup_left, backup_right = st.columns(2)
+        backup_left.download_button(
+            "تنزيل نسخة احتياطية Excel",
+            data=backup_buffer.getvalue(),
+            file_name=f"onespot_backup_{backup_stamp}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        backup_right.download_button(
+            "تنزيل نسخة احتياطية CSV",
+            data=backup_csv,
+            file_name=f"onespot_backup_{backup_stamp}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        st.caption("نزّل نسخة احتياطية قبل حذف قيد، واحتفظ بها على جهازك.")
+
+    with st.expander("تعديل قيد", expanded=False):
+        if data_view.empty:
+            st.info("لا توجد قيود متاحة للتعديل.")
+        else:
+            edit_options = {
+                int(row["ID"]): (
+                    f"رقم {int(row['ID'])} | {row['Date']} | {row['Branch']} | "
+                    f"{format_currency(row['Amount'])} | {str(row['Description'])[:40]}"
+                )
+                for _, row in data_view.sort_values("ID", ascending=False).iterrows()
+            }
+            edit_id = st.selectbox(
+                "اختر القيد:",
+                options=[None] + list(edit_options),
+                format_func=lambda value: "-- اختر القيد --" if value is None else edit_options[value],
+                key="edit_transaction_id",
+            )
+            if edit_id is not None:
+                old_row = data_view.loc[data_view["ID"] == edit_id].iloc[0]
+                with st.form("edit_transaction_form"):
+                    edit_cols = st.columns([.9, .9, 1.1, .9, 1.7])
+                    with edit_cols[0]:
+                        edit_type = st.selectbox(
+                            "النوع:", ["Income", "Expense"],
+                            index=0 if old_row["Type"] == "Income" else 1,
+                            format_func=lambda value: "إيراد" if value == "Income" else "مصروف",
+                        )
+                    with edit_cols[1]:
+                        edit_branch = st.selectbox(
+                            "الفرع:", BRANCHES,
+                            index=BRANCHES.index(old_row["Branch"]) if old_row["Branch"] in BRANCHES else 0,
+                        )
+                    with edit_cols[2]:
+                        edit_date = st.date_input("التاريخ:", value=pd.to_datetime(old_row["Date"]).date())
+                    with edit_cols[3]:
+                        all_categories = INCOME_CATS + EXPENSE_CATS
+                        current_category = old_row["Category"]
+                        category_options = list(dict.fromkeys(all_categories + [current_category]))
+                        edit_category = st.selectbox(
+                            "البند:", category_options,
+                            index=category_options.index(current_category),
+                        )
+                    with edit_cols[4]:
+                        edit_amount = st.number_input(
+                            "المبلغ (ج.م):", min_value=0.0,
+                            value=float(old_row["Amount"]), step=10.0, format="%.2f",
+                        )
+                    edit_description = st.text_input("البيان:", value=str(old_row["Description"]))
+                    edit_submitted = st.form_submit_button("حفظ التعديل", type="primary")
+
+                if edit_submitted:
+                    if edit_amount <= 0 or not edit_description.strip():
+                        st.error("أدخل مبلغًا أكبر من صفر وبيانًا للقيد.")
+                    else:
+                        latest_df, latest_error = load_data()
+                        if latest_error:
+                            st.error("تعذر تحميل القيود: " + latest_error)
+                        elif edit_id not in latest_df["ID"].values:
+                            st.error("القيد غير موجود. حدّث الصفحة وجرب مرة أخرى.")
+                        else:
+                            edited_df = latest_df.copy()
+                            mask = edited_df["ID"] == edit_id
+                            edited_df.loc[mask, "Date"] = edit_date.strftime("%Y-%m-%d")
+                            edited_df.loc[mask, "Month_No"] = edit_date.month
+                            edited_df.loc[mask, "Branch"] = edit_branch
+                            edited_df.loc[mask, "Category"] = edit_category
+                            edited_df.loc[mask, "Type"] = edit_type
+                            edited_df.loc[mask, "Amount"] = float(edit_amount)
+                            edited_df.loc[mask, "Description"] = edit_description.strip()
+                            try:
+                                save_data(edited_df)
+                                st.success(f"تم تعديل القيد رقم {edit_id}.")
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(f"تعذر حفظ التعديل: {exc}")
+
     # =====================================================
     # 8. حذف القيود
     # =====================================================
@@ -1121,6 +1377,36 @@ with tab_admin:
                                 st.rerun()
                             except Exception as exc:
                                 st.error(f"تعذر إكمال الحذف والحفظ. التفاصيل: {exc}")
+
+    with st.expander("سجل تعديلات القيود", expanded=False):
+        try:
+            audit_df = load_transaction_audit()
+            if audit_df.empty:
+                st.info("ستظهر هنا عمليات إضافة القيود أو تعديلها أو حذفها.")
+            else:
+                audit_view = audit_df.rename(columns={
+                    "occurred_at": "وقت العملية",
+                    "actor": "المستخدم",
+                    "action": "العملية",
+                    "transaction_id": "رقم القيد",
+                    "transaction_date": "تاريخ القيد",
+                    "branch": "الفرع",
+                    "category": "البند",
+                    "transaction_type": "النوع",
+                    "amount": "المبلغ (ج.م)",
+                    "description": "البيان",
+                }).copy()
+                if "النوع" in audit_view.columns:
+                    audit_view["النوع"] = audit_view["النوع"].map({"Income": "إيراد", "Expense": "مصروف"})
+                st.dataframe(audit_view, use_container_width=True, hide_index=True)
+                st.download_button(
+                    "تنزيل سجل التعديلات CSV",
+                    data=audit_view.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="onespot_transaction_audit.csv",
+                    mime="text/csv",
+                )
+        except Exception as exc:
+            st.warning(f"تعذر تحميل سجل التعديلات: {exc}")
 
 with tab_reports:
     st.subheader("مقارنة الفروع والتقرير الشهري")
@@ -1232,11 +1518,129 @@ with tab_reports:
             mime="text/csv",
         )
 
+    with st.expander("مصروفات شهرية متكررة", expanded=False):
+        st.caption("أضف الإيجار أو الرواتب أو غيرها مرة واحدة؛ سيذكّرك النظام بها كل شهر. لا يُسجَّل المصروف إلا عند ضغطك على زر التسجيل.")
+        recurring_engine = get_database_engine()
+        if recurring_engine is None:
+            st.info("المصروفات المتكررة تحتاج اتصال Neon حتى تُحفظ إعداداتها.")
+        else:
+            try:
+                from sqlalchemy import text
+
+                ensure_database(recurring_engine)
+                with st.form("recurring_expense_form"):
+                    recurring_cols = st.columns([1, 1.4, .9, .7, 1.6])
+                    with recurring_cols[0]:
+                        recurring_branch = st.selectbox("الفرع", BRANCHES, key="rec_branch")
+                    with recurring_cols[1]:
+                        recurring_category = st.selectbox("البند", EXPENSE_CATS, key="rec_category")
+                    with recurring_cols[2]:
+                        recurring_amount = st.number_input("المبلغ (ج.م)", min_value=0.0, step=100.0, key="rec_amount")
+                    with recurring_cols[3]:
+                        recurring_due_day = st.number_input("يوم الاستحقاق", min_value=1, max_value=28, value=1, step=1, key="rec_due_day")
+                    with recurring_cols[4]:
+                        recurring_description = st.text_input("البيان", key="rec_description")
+                    recurring_submitted = st.form_submit_button("إضافة مصروف متكرر", use_container_width=True)
+
+                if recurring_submitted:
+                    if recurring_amount <= 0 or not recurring_description.strip():
+                        st.error("أدخل مبلغًا أكبر من صفر وبيانًا للمصروف.")
+                    else:
+                        with recurring_engine.begin() as connection:
+                            connection.execute(text("""
+                              INSERT INTO recurring_expenses (branch, category, amount, description, due_day)
+                              VALUES (:branch, :category, :amount, :description, :due_day)
+                            """), {
+                                "branch": recurring_branch,
+                                "category": recurring_category,
+                                "amount": float(recurring_amount),
+                                "description": recurring_description.strip(),
+                                "due_day": int(recurring_due_day),
+                            })
+                        st.success("تمت إضافة المصروف المتكرر.")
+                        st.rerun()
+
+                recurring_df = pd.read_sql_query(text("""
+                  SELECT id, branch, category, amount, description, due_day
+                  FROM recurring_expenses WHERE active = TRUE ORDER BY id
+                """), recurring_engine)
+                if recurring_df.empty:
+                    st.info("لم تضف مصروفات متكررة بعد.")
+                else:
+                    current_month = datetime.date.today().strftime("%Y-%m")
+                    current_month_df = data_view.copy()
+                    if not current_month_df.empty:
+                        current_month_df["Parsed_Date"] = pd.to_datetime(current_month_df["Date"], errors="coerce")
+                        current_month_df = current_month_df[
+                            current_month_df["Parsed_Date"].dt.strftime("%Y-%m") == current_month
+                        ]
+                    st.markdown("#### استحقاق هذا الشهر")
+                    for _, recurring in recurring_df.iterrows():
+                        match = current_month_df[
+                            (current_month_df["Branch"].astype(str) == str(recurring["branch"]))
+                            & (current_month_df["Category"].astype(str) == str(recurring["category"]))
+                            & (pd.to_numeric(current_month_df["Amount"], errors="coerce").round(2) == round(float(recurring["amount"]), 2))
+                            & (current_month_df["Description"].fillna("").astype(str).str.strip().str.casefold() == str(recurring["description"]).strip().casefold())
+                            & (current_month_df["Type"] == "Expense")
+                        ]
+                        item_label = f"{recurring['branch']} · {recurring['description']} · {format_currency(recurring['amount'])} · يوم {int(recurring['due_day'])}"
+                        item_cols = st.columns([3, 1])
+                        with item_cols[0]:
+                            if not match.empty:
+                                st.success(f"تم تسجيله هذا الشهر: {item_label}")
+                            else:
+                                st.warning(f"لم يُسجل بعد: {item_label}")
+                        with item_cols[1]:
+                            if match.empty and st.button("تسجيل المصروف", key=f"recurring_post_{int(recurring['id'])}", use_container_width=True):
+                                try:
+                                    due_date = datetime.date.today().replace(day=int(recurring["due_day"]))
+                                    latest_df, latest_error = load_data()
+                                    if latest_error:
+                                        st.error("تعذر تحميل القيود: " + latest_error)
+                                    else:
+                                        next_id = int(latest_df["ID"].max()) + 1 if not latest_df.empty else 1
+                                        new_expense = pd.DataFrame([{
+                                            "ID": next_id,
+                                            "Date": due_date.strftime("%Y-%m-%d"),
+                                            "Month_No": due_date.month,
+                                            "Branch": recurring["branch"],
+                                            "Category": recurring["category"],
+                                            "Type": "Expense",
+                                            "Amount": float(recurring["amount"]),
+                                            "Description": recurring["description"],
+                                        }])
+                                        save_data(pd.concat([latest_df, new_expense], ignore_index=True))
+                                        st.success("تم تسجيل المصروف في سجل القيود.")
+                                        st.rerun()
+                                except Exception as exc:
+                                    st.error(f"تعذر تسجيل المصروف المتكرر: {exc}")
+
+                    st.markdown("#### إدارة المصروفات المتكررة")
+                    recurring_options = {
+                        int(row["id"]): f"{row['branch']} | {row['description']} | {format_currency(row['amount'])}"
+                        for _, row in recurring_df.iterrows()
+                    }
+                    selected_recurring_id = st.selectbox(
+                        "اختار مصروفًا لإيقاف تكراره:",
+                        options=[None] + list(recurring_options),
+                        format_func=lambda value: "-- اختر --" if value is None else recurring_options[value],
+                        key="recurring_delete_select",
+                    )
+                    if selected_recurring_id is not None and st.button("إيقاف هذا المصروف المتكرر", key="recurring_deactivate"):
+                        from sqlalchemy import text
+                        with recurring_engine.begin() as connection:
+                            connection.execute(text("UPDATE recurring_expenses SET active = FALSE WHERE id = :id"), {"id": int(selected_recurring_id)})
+                        st.success("تم إيقاف تكرار المصروف؛ القيود المسجلة لا تتأثر.")
+                        st.rerun()
+            except Exception as exc:
+                st.warning(f"تعذر تحميل المصروفات المتكررة من Neon: {exc}")
+
 with tab_attendance:
     st.subheader("الحضور والانصراف — فريق OneSpot")
     st.caption(
         "ارفع ملف الحضور بصيغة Excel لعرض ساعات العمل والسلف لكل موظف. "
-        "سيتم جمع الموظفين معًا تحت OneSpot لأن مواقع عملهم متغيرة."
+        "سيتم جمع الموظفين معًا تحت OneSpot لأن مواقع عملهم متغيرة. "
+        "البيانات للعرض المؤقت فقط ولا تُحفظ في Neon."
     )
 
     attendance_file = st.file_uploader(
