@@ -3,4 +3,4 @@ pandas
 plotly
 openpyxl
 SQLAlchemy
-psycopg2-binary
+psycopg[binary]
