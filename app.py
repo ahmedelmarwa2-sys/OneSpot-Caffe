@@ -1739,6 +1739,7 @@ with tab_attendance:
 
     attendance_df = st.session_state.get("attendance_imported_df")
     if attendance_df is not None and not attendance_df.empty:
+        monthly_hours_target = 234.0
         month_values = sorted(attendance_df["التاريخ"].dt.strftime("%Y-%m").unique(), reverse=True)
         selected_attendance_month = st.selectbox(
             "الشهر:", ["كل الشهور"] + month_values, key="attendance_month_filter"
@@ -1759,16 +1760,47 @@ with tab_attendance:
         metric_cols[2].metric("أيام العمل المسجلة", f"{worked_days}")
         metric_cols[3].metric("إجمالي السلف", format_currency(total_advances))
 
-        employee_summary = attendance_view.groupby("الموظف", as_index=False).agg(
+        attendance_view = attendance_view.copy()
+        attendance_view["الشهر المحسوب"] = attendance_view["التاريخ"].dt.strftime("%Y-%m")
+        monthly_employee_summary = attendance_view.groupby(
+            ["الموظف", "الشهر المحسوب"], as_index=False
+        ).agg(
             **{"أيام العمل": ("ساعات العمل", lambda values: int((values > 0).sum())),
                "إجمالي الساعات": ("ساعات العمل", "sum"),
                "إجمالي السلف (ج.م)": ("السلفة (ج.م)", "sum")}
         )
+        employee_summary = monthly_employee_summary.groupby("الموظف", as_index=False).agg(
+            **{"عدد الشهور": ("الشهر المحسوب", "nunique"),
+               "أيام العمل": ("أيام العمل", "sum"),
+               "إجمالي الساعات": ("إجمالي الساعات", "sum"),
+               "إجمالي السلف (ج.م)": ("إجمالي السلف (ج.م)", "sum")}
+        )
+        employee_summary["الساعات المستهدفة"] = (
+            employee_summary["عدد الشهور"] * monthly_hours_target
+        )
+        employee_summary["الفرق عن المستهدف"] = (
+            employee_summary["إجمالي الساعات"] - employee_summary["الساعات المستهدفة"]
+        )
+        employee_summary["الحالة"] = employee_summary["الفرق عن المستهدف"].apply(
+            lambda difference: "مكتمل" if abs(difference) < 0.01
+            else ("أعلى من المستهدف" if difference > 0 else "أقل من المستهدف")
+        )
+        employee_summary = employee_summary[
+            ["الموظف", "عدد الشهور", "أيام العمل", "إجمالي الساعات",
+             "الساعات المستهدفة", "الفرق عن المستهدف", "الحالة", "إجمالي السلف (ج.م)"]
+        ]
         st.markdown("#### ملخص الموظفين")
+        st.caption(
+            f"المستهدف {monthly_hours_target:,.0f} ساعة لكل موظف عن كل شهر ظاهر له في الملف. "
+            "ملف الحضور للعرض المؤقت فقط ولا يُحفظ في Neon."
+        )
         st.dataframe(
             employee_summary.style.format({
+                "عدد الشهور": "{:,.0f}",
                 "أيام العمل": "{:,.0f}",
                 "إجمالي الساعات": "{:,.2f}",
+                "الساعات المستهدفة": "{:,.2f}",
+                "الفرق عن المستهدف": "{:+,.2f}",
                 "إجمالي السلف (ج.م)": "{:,.2f}",
             }),
             use_container_width=True,
