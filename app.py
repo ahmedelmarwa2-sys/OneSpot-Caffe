@@ -2106,123 +2106,148 @@ with tab_employee_tracking:
         tracking_months = sorted(
             tracking_df["التاريخ"].dt.strftime("%Y-%m").dropna().unique(), reverse=True
         )
-        st.markdown("#### 👤 التقرير الشهري للموظف")
-        st.caption("اختار الموظف والشهر لعرض تفاصيل الحضور والإجازات يومًا بيوم.")
-        report_cols = st.columns(2)
-        report_employees = sorted(
-            tracking_df["الموظف"].dropna().astype(str).str.strip().unique().tolist(),
-            key=str.casefold,
-        )
-        selected_report_employee = report_cols[0].selectbox(
-            "اختر الموظف:", report_employees, key="employee_monthly_report_employee"
-        )
-        month_names_ar = [
-            "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-            "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
-        ]
-        selected_report_month = report_cols[1].selectbox(
-            "اختر الشهر:", tracking_months,
-            format_func=lambda value: (
-                f"{month_names_ar[int(value[5:7]) - 1]} {value[:4]}"
-            ),
-            key="employee_monthly_report_month",
-        )
-
-        report_rows = tracking_df[
-            (tracking_df["الموظف"].astype(str).str.strip() == selected_report_employee)
-            & (tracking_df["التاريخ"].dt.strftime("%Y-%m") == selected_report_month)
-        ].copy()
-        month_start = pd.Period(selected_report_month, freq="M").start_time.normalize()
-        calendar = pd.DataFrame({
-            "التاريخ": pd.date_range(month_start, periods=month_start.days_in_month, freq="D")
-        })
-        report_rows = calendar.merge(report_rows, on="التاريخ", how="left")
-        weekday_ar = {
-            0: "الاثنين", 1: "الثلاثاء", 2: "الأربعاء", 3: "الخميس",
-            4: "الجمعة", 5: "السبت", 6: "الأحد",
-        }
-        report_off_days = attendance_off_mask(report_rows)
-        report_rows["اليوم"] = [
-            "OFF" if is_off else weekday_ar[day.weekday()]
-            for day, is_off in zip(report_rows["التاريخ"], report_off_days)
-        ]
-        report_rows["ساعات العمل"] = pd.to_numeric(
-            report_rows["ساعات العمل"], errors="coerce"
-        ).fillna(0.0)
-        report_rows["السلفة (ج.م)"] = pd.to_numeric(
-            report_rows["السلفة (ج.م)"], errors="coerce"
-        ).fillna(0.0)
-        report_rows["الحالة"] = report_rows.apply(attendance_status_for_row, axis=1)
-        report_attended = int(report_rows["الحالة"].isin(["حضور", "حضور في يوم OFF"]).sum())
-        report_off = int(report_rows["الحالة"].str.contains("OFF", case=False).sum())
-        report_unrecorded = int(report_rows["الحالة"].eq("لا يوجد تسجيل").sum())
-        report_hours = float(report_rows["ساعات العمل"].sum())
-        report_advances = float(report_rows["السلفة (ج.م)"].sum())
-        report_metrics = st.columns(5)
-        report_metrics[0].metric("أيام الحضور", f"{report_attended}")
-        report_metrics[1].metric("أيام الإجازة (OFF)", f"{report_off}")
-        report_metrics[2].metric("أيام بلا سجل", f"{report_unrecorded}")
-        report_metrics[3].metric("إجمالي الساعات", f"{report_hours:,.2f}")
-        report_metrics[4].metric("السلف", format_currency(report_advances))
-        report_display = report_rows[[
-            "التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف",
-            "ساعات العمل", "السلفة (ج.م)",
-        ]].copy()
-        report_display["التاريخ"] = report_display["التاريخ"].dt.strftime("%Y-%m-%d")
-        def safe_report_value(value):
-            if value is None or pd.isna(value) or str(value).strip().lower() in {"none", "nan", "nat"}:
-                return "—"
-            return html.escape(str(value))
-
-        report_table_rows = []
-        for record in report_display.to_dict("records"):
-            status = str(record["الحالة"])
-            if "OFF" in status.upper():
-                badge_style = "background:#f6eddc;color:#8b612e;"
-            elif "حضور" in status:
-                badge_style = "background:#e7f1ea;color:#367454;"
-            else:
-                badge_style = "background:#f6e9e6;color:#a84f45;"
-            report_table_rows.append(
-                "<tr>"
-                f"<td>{safe_report_value(record['التاريخ'])}</td>"
-                f"<td>{safe_report_value(record['اليوم'])}</td>"
-                f"<td><span style='display:inline-block;border-radius:999px;padding:5px 11px;"
-                f"font-size:12px;font-weight:600;white-space:nowrap;{badge_style}'>"
-                f"{safe_report_value(status)}</span></td>"
-                f"<td>{safe_report_value(record['الحضور'])}</td>"
-                f"<td>{safe_report_value(record['الانصراف'])}</td>"
-                f"<td>{float(record['ساعات العمل'] or 0):,.2f}</td>"
-                f"<td>{float(record['السلفة (ج.م)'] or 0):,.2f}</td>"
-                "</tr>"
+        with st.container(key="employee_report_design"):
+            st.markdown("""
+            <style>
+              .st-key-employee_report_design,
+              .st-key-employee_report_design * {
+                font-family:"Segoe UI",Tahoma,Arial,sans-serif !important;
+              }
+              .st-key-employee_report_design h3 {
+                color:#2d2119 !important; font-size:22px !important; font-weight:700 !important;
+              }
+              .st-key-employee_report_design [data-testid="stSelectbox"] label {
+                color:#74665b !important; font-size:12px !important; font-weight:500 !important;
+              }
+              .st-key-employee_report_design [data-baseweb="select"] > div {
+                background:#fffdfa !important; border:1px solid #e5d9cc !important;
+                border-radius:8px !important; min-height:42px !important;
+              }
+              .st-key-employee_report_design [data-testid="stMetric"] {
+                background:#ffffff !important; border:1px solid #e7ddd2 !important;
+                border-radius:11px !important; padding:12px 14px !important; box-shadow:none !important;
+              }
+              .st-key-employee_report_design [data-testid="stMetricLabel"] {
+                color:#74665b !important; font-size:11px !important;
+              }
+              .st-key-employee_report_design [data-testid="stMetricValue"] {
+                color:#2d2119 !important; font-size:24px !important;
+              }
+            </style>
+            """, unsafe_allow_html=True)
+            st.markdown("### تقرير الموظف الشهري")
+            st.caption("عرض الحضور والانصراف والإجازات يومًا بيوم.")
+            report_cols = st.columns(2)
+            report_employees = sorted(
+                tracking_df["الموظف"].dropna().astype(str).str.strip().unique().tolist(),
+                key=str.casefold,
             )
-        report_table_html = """
-        <style>
-          .onespot-monthly-report { direction:rtl; width:100%; overflow-x:auto; border:1px solid #e7ddd2; border-radius:10px; background:#fff; }
-          .onespot-monthly-report table { width:100%; border-collapse:collapse; font-family:Arial,"Segoe UI",sans-serif; font-size:13px; color:#2d2924; }
-          .onespot-monthly-report th { padding:11px 12px; text-align:right; white-space:nowrap; background:#f7f8fa; color:#74665b; font-weight:500; border-bottom:1px solid #e7ddd2; }
-          .onespot-monthly-report td { padding:10px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #eee9e3; }
-          .onespot-monthly-report tbody tr:last-child td { border-bottom:0; }
-          .onespot-monthly-report tbody tr:hover { background:#fbf8f4; }
-          @media (max-width:700px) { .onespot-monthly-report table { min-width:760px; } }
-        </style>
-        <div class="onespot-monthly-report"><table>
-          <thead><tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th><th>السلفة (ج.م)</th></tr></thead>
-          <tbody>
-        """ + "".join(report_table_rows) + """
-          </tbody>
-        </table></div>
-        """
-        st.markdown(report_table_html, unsafe_allow_html=True)
-        st.download_button(
-            "تنزيل تقرير الموظف لهذا الشهر",
-            data=report_display.to_csv(index=False).encode("utf-8-sig"),
-            file_name=(
-                f"onespot_{selected_report_employee}_{selected_report_month}.csv"
-            ),
-            mime="text/csv",
-            key="employee_monthly_report_download",
-        )
+            selected_report_employee = report_cols[0].selectbox(
+                "اختر الموظف:", report_employees, key="employee_monthly_report_employee"
+            )
+            month_names_ar = [
+                "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+            ]
+            selected_report_month = report_cols[1].selectbox(
+                "اختر الشهر:", tracking_months,
+                format_func=lambda value: (
+                    f"{month_names_ar[int(value[5:7]) - 1]} {value[:4]}"
+                ),
+                key="employee_monthly_report_month",
+            )
+
+            report_rows = tracking_df[
+                (tracking_df["الموظف"].astype(str).str.strip() == selected_report_employee)
+                & (tracking_df["التاريخ"].dt.strftime("%Y-%m") == selected_report_month)
+            ].copy()
+            month_start = pd.Period(selected_report_month, freq="M").start_time.normalize()
+            calendar = pd.DataFrame({
+                "التاريخ": pd.date_range(month_start, periods=month_start.days_in_month, freq="D")
+            })
+            report_rows = calendar.merge(report_rows, on="التاريخ", how="left")
+            weekday_ar = {
+                0: "الاثنين", 1: "الثلاثاء", 2: "الأربعاء", 3: "الخميس",
+                4: "الجمعة", 5: "السبت", 6: "الأحد",
+            }
+            report_off_days = attendance_off_mask(report_rows)
+            report_rows["اليوم"] = [
+                "OFF" if is_off else weekday_ar[day.weekday()]
+                for day, is_off in zip(report_rows["التاريخ"], report_off_days)
+            ]
+            report_rows["ساعات العمل"] = pd.to_numeric(
+                report_rows["ساعات العمل"], errors="coerce"
+            ).fillna(0.0)
+            report_rows["السلفة (ج.م)"] = pd.to_numeric(
+                report_rows["السلفة (ج.م)"], errors="coerce"
+            ).fillna(0.0)
+            report_rows["الحالة"] = report_rows.apply(attendance_status_for_row, axis=1)
+            report_attended = int(report_rows["الحالة"].isin(["حضور", "حضور في يوم OFF"]).sum())
+            report_off = int(report_rows["الحالة"].str.contains("OFF", case=False).sum())
+            report_unrecorded = int(report_rows["الحالة"].eq("لا يوجد تسجيل").sum())
+            report_hours = float(report_rows["ساعات العمل"].sum())
+            report_metrics = st.columns(4)
+            report_metrics[0].metric("أيام الحضور", f"{report_attended}")
+            report_metrics[1].metric("أيام الإجازة (OFF)", f"{report_off}")
+            report_metrics[2].metric("أيام بلا سجل", f"{report_unrecorded}")
+            report_metrics[3].metric("إجمالي الساعات", f"{report_hours:,.2f}")
+            report_display = report_rows[[
+                "التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف",
+                "ساعات العمل", "السلفة (ج.م)",
+            ]].copy()
+            report_display["التاريخ"] = report_display["التاريخ"].dt.strftime("%Y-%m-%d")
+            def safe_report_value(value):
+                if value is None or pd.isna(value) or str(value).strip().lower() in {"none", "nan", "nat"}:
+                    return "—"
+                return html.escape(str(value))
+
+            report_table_rows = []
+            for record in report_display.to_dict("records"):
+                status = str(record["الحالة"])
+                if "OFF" in status.upper():
+                    badge_style = "background:#f6eddc;color:#8b612e;"
+                elif "حضور" in status:
+                    badge_style = "background:#e7f1ea;color:#367454;"
+                else:
+                    badge_style = "background:#f6e9e6;color:#a84f45;"
+                report_table_rows.append(
+                    "<tr>"
+                    f"<td>{safe_report_value(record['التاريخ'])}</td>"
+                    f"<td>{safe_report_value(record['اليوم'])}</td>"
+                    f"<td><span style='display:inline-block;border-radius:999px;padding:5px 11px;"
+                    f"font-size:12px;font-weight:600;white-space:nowrap;{badge_style}'>"
+                    f"{safe_report_value(status)}</span></td>"
+                    f"<td>{safe_report_value(record['الحضور'])}</td>"
+                    f"<td>{safe_report_value(record['الانصراف'])}</td>"
+                    f"<td>{float(record['ساعات العمل'] or 0):,.2f}</td>"
+                    f"<td>{float(record['السلفة (ج.م)'] or 0):,.2f}</td>"
+                    "</tr>"
+                )
+            report_table_html = """
+            <style>
+              .onespot-monthly-report { direction:rtl; width:100%; overflow-x:auto; border:1px solid #e7ddd2; border-radius:10px; background:#fff; }
+              .onespot-monthly-report table { width:100%; border-collapse:collapse; font-family:"Segoe UI",Tahoma,Arial,sans-serif; font-size:12px; color:#2d2924; }
+              .onespot-monthly-report th { padding:11px 12px; text-align:right; white-space:nowrap; background:#f7f8fa; color:#74665b; font-size:11px; font-weight:500; border-bottom:1px solid #e7ddd2; }
+              .onespot-monthly-report td { padding:10px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #eee9e3; }
+              .onespot-monthly-report tbody tr:last-child td { border-bottom:0; }
+              .onespot-monthly-report tbody tr:hover { background:#fbf8f4; }
+              @media (max-width:700px) { .onespot-monthly-report table { min-width:760px; } }
+            </style>
+            <div class="onespot-monthly-report"><table>
+              <thead><tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th><th>السلفة (ج.م)</th></tr></thead>
+              <tbody>
+            """ + "".join(report_table_rows) + """
+              </tbody>
+            </table></div>
+            """
+            st.markdown(report_table_html, unsafe_allow_html=True)
+            st.markdown("""
+            <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:12px;color:#74665b;">
+              <span><b style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#367454;margin-left:6px;"></b>حضور</span>
+              <span><b style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#b98242;margin-left:6px;"></b>إجازة / OFF</span>
+              <span><b style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a84f45;margin-left:6px;"></b>لا يوجد تسجيل</span>
+            </div>
+            """, unsafe_allow_html=True)
 
         with st.expander("الملخص العام لكل الموظفين", expanded=False):
             selected_tracking_month = st.selectbox(
